@@ -58,7 +58,7 @@ class Setting extends Model
      */
     public static function get(string $key, mixed $default = null): mixed
     {
-        $cacheKey = self::CACHE_PREFIX . $key;
+        $cacheKey = self::CACHE_PREFIX.$key;
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($key, $default) {
             $setting = static::find($key);
@@ -88,7 +88,7 @@ class Setting extends Model
             ['value' => $storedValue]
         );
 
-        Cache::forget(self::CACHE_PREFIX . $key);
+        Cache::forget(self::CACHE_PREFIX.$key);
     }
 
     /**
@@ -104,7 +104,7 @@ class Setting extends Model
      */
     public static function forget(string $key): bool
     {
-        Cache::forget(self::CACHE_PREFIX . $key);
+        Cache::forget(self::CACHE_PREFIX.$key);
 
         return (bool) static::where('key', $key)->delete();
     }

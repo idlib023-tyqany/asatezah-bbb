@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\FileStorage;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,9 +23,7 @@ class SupportConversationResource extends JsonResource
             'user' => $this->whenLoaded('user', fn () => [
                 'id' => $this->user->id,
                 'name' => $this->user->name,
-                'avatar_url' => $this->user->avatar_path
-                    ? asset('storage/'.$this->user->avatar_path)
-                    : null,
+                'avatar_url' => FileStorage::url($this->user->avatar_path),
             ]),
             'admin' => $this->whenLoaded('admin', fn () => $this->admin
                 ? [

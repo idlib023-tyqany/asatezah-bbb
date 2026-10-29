@@ -15,7 +15,7 @@ class UploadApiTest extends TestCase
 
     public function test_contributor_uploads_a_file_for_review(): void
     {
-        Storage::fake('public');
+        Storage::fake();
         $user = User::factory()->create(['can_contribute' => true]);
 
         $response = $this->actingAs($user, 'sanctum')
@@ -38,7 +38,7 @@ class UploadApiTest extends TestCase
             'uploaded_by' => $user->id,
             'content_hash' => $file->content_hash,
         ]);
-        $this->assertTrue(Storage::disk('public')->exists($file->path));
+        $this->assertTrue(Storage::disk()->exists($file->path));
         $this->assertStringStartsWith('documents/', $file->path);
         $this->assertSame(
             route('api.files.download', ['file' => $file->id]),
@@ -48,7 +48,7 @@ class UploadApiTest extends TestCase
 
     public function test_uploads_are_stored_in_a_folder_based_on_their_mime_type(): void
     {
-        Storage::fake('public');
+        Storage::fake();
         $user = User::factory()->create(['can_contribute' => true]);
 
         $uploads = [
@@ -86,15 +86,45 @@ class UploadApiTest extends TestCase
             $response->assertCreated();
             $path = File::query()->where('title', $upload['title'])->value('path');
             $this->assertStringStartsWith($upload['folder'].'/', $path);
-            $this->assertTrue(Storage::disk('public')->exists($path));
+            $this->assertTrue(Storage::disk()->exists($path));
         }
 
         $this->assertDatabaseCount('files', count($uploads));
     }
 
+    public function test_published_file_download_streams_from_the_configured_disk(): void
+    {
+        Storage::fake();
+        $user = User::factory()->create();
+        $path = 'documents/lesson.pdf';
+        Storage::disk()->put($path, 'downloadable file content');
+
+        $file = File::create([
+            'uploaded_by' => $user->id,
+            'title' => 'Lesson notes',
+            'filename' => 'lesson.pdf',
+            'path' => $path,
+            'mime_type' => 'application/pdf',
+            'file_size' => 25,
+            'content_hash' => hash('sha256', 'downloadable file content'),
+            'status' => File::STATUS_PUBLISHED,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->get(route('api.files.download', ['file' => $file->id]))
+            ->assertOk()
+            ->assertDownload('lesson.pdf')
+            ->assertStreamedContent('downloadable file content');
+
+        $this->assertDatabaseHas('files', [
+            'id' => $file->id,
+            'downloads_count' => 1,
+        ]);
+    }
+
     public function test_upload_rejects_unsupported_file_types(): void
     {
-        Storage::fake('public');
+        Storage::fake();
         $user = User::factory()->create(['can_contribute' => true]);
 
         $this->actingAs($user, 'sanctum')
@@ -106,12 +136,12 @@ class UploadApiTest extends TestCase
             ->assertJsonValidationErrors('file');
 
         $this->assertDatabaseCount('files', 0);
-        $this->assertSame([], Storage::disk('public')->allFiles());
+        $this->assertSame([], Storage::disk()->allFiles());
     }
 
     public function test_user_without_upload_permission_is_rejected(): void
     {
-        Storage::fake('public');
+        Storage::fake();
         $user = User::factory()->create(['can_contribute' => false]);
 
         $this->actingAs($user, 'sanctum')
@@ -122,7 +152,7 @@ class UploadApiTest extends TestCase
             ->assertForbidden();
 
         $this->assertDatabaseCount('files', 0);
-        $this->assertSame([], Storage::disk('public')->allFiles());
+        $this->assertSame([], Storage::disk()->allFiles());
     }
 
     public function test_upload_endpoint_is_rate_limited(): void

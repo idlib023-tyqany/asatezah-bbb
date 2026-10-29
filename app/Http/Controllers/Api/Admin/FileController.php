@@ -6,12 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\FileResource;
 use App\Models\File;
 use App\Models\User;
+use App\Support\FileStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class FileController extends Controller
@@ -30,8 +30,8 @@ class FileController extends Controller
             'category',
             'material',
             'user',
-            'favorites' => fn($query) => $query->where('user_id', $userId),
-            'ratings' => fn($query) => $query->where('user_id', $userId),
+            'favorites' => fn ($query) => $query->where('user_id', $userId),
+            'ratings' => fn ($query) => $query->where('user_id', $userId),
         ]);
 
         // فلترة بالبحث النصي
@@ -289,7 +289,7 @@ class FileController extends Controller
      */
     private function deletePhysicalFiles(File $file): void
     {
-        $disk = Storage::disk('public');
+        $disk = FileStorage::disk();
 
         if (! empty($file->path) && $disk->exists($file->path)) {
             $disk->delete($file->path);

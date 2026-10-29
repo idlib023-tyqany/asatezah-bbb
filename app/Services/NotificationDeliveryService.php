@@ -86,7 +86,7 @@ class NotificationDeliveryService
         $now = now();
 
         $query->select('id')->chunkById(500, function ($users) use ($notificationId, $now) {
-            $rows = $users->map(fn($user) => [
+            $rows = $users->map(fn ($user) => [
                 'user_id' => $user->id,
                 'notification_id' => $notificationId,
                 'read' => false,

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\FileStorage;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -188,9 +189,7 @@ class SocialAuthController extends Controller
                 'display_name' => $user->display_name,
                 'phone_number' => $user->phone_number,
                 'trainer_type' => $user->trainer_type,
-                'avatar_url' => $user->avatar_path
-                    ? asset('storage/'.$user->avatar_path)
-                    : null,
+                'avatar_url' => FileStorage::url($user->avatar_path),
             ],
         ]);
     }

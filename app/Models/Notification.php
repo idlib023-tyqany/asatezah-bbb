@@ -15,7 +15,9 @@ class Notification extends Model
     use HasFactory;
 
     public const AUDIENCE_ALL = 'all';
+
     public const AUDIENCE_SPECIALIZATION = 'specialization';
+
     public const AUDIENCE_ROLE = 'role';
 
     /**

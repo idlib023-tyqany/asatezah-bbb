@@ -7,6 +7,7 @@ use App\Http\Resources\MessageResource;
 use App\Http\Resources\SupportConversationResource;
 use App\Models\Message;
 use App\Models\SupportConversation;
+use App\Support\FileStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -56,7 +57,7 @@ class SupportController extends Controller
 
             $imagePath = null;
             if ($request->hasFile('image')) {
-                $imagePath = $request->file('image')->store('support-images', 'public');
+                $imagePath = FileStorage::store($request->file('image'), 'support-images');
             }
 
             if (! empty($validated['message']) || $imagePath !== null) {
@@ -115,7 +116,7 @@ class SupportController extends Controller
         $message = DB::transaction(function () use ($request, $conversation, $user, $validated, $isAdmin) {
             $imagePath = null;
             if ($request->hasFile('image')) {
-                $imagePath = $request->file('image')->store('support-images', 'public');
+                $imagePath = FileStorage::store($request->file('image'), 'support-images');
             }
 
             $msg = $conversation->messages()->create([

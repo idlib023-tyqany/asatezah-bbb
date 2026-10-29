@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
+use App\Support\FileStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 
@@ -38,7 +39,7 @@ class AppInfoController extends Controller
             $logoPath = $settings['logo_path'] ?? null;
 
             // استخدام asset() لضمان توليد URL كامل ومستقر لتطبيق Flutter
-            $logoUrl = ! empty($logoPath) ? asset('storage/' . $logoPath) : null;
+            $logoUrl = FileStorage::url($logoPath);
 
             return [
                 'name' => $settings['app_name'] ?? 'أساتذة',

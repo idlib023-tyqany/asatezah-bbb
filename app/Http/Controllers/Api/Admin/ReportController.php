@@ -22,7 +22,7 @@ class ReportController extends Controller
         // جلب العلاقات مع دعم الملفات المحذوفة مؤقتاً حتى لا يظهر الملف كـ null
         $query = Report::with([
             'user:id,name,email',
-            'file' => fn($q) => $q->withTrashed()->select('id', 'title', 'status', 'deleted_at'),
+            'file' => fn ($q) => $q->withTrashed()->select('id', 'title', 'status', 'deleted_at'),
         ]);
 
         // دعم البحث النصي داخل البلاغات إذا وجد

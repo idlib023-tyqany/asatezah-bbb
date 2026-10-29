@@ -297,7 +297,7 @@ class AuthenticationApiTest extends TestCase
 
     public function test_profile_avatar_uses_the_existing_avatar_column_and_public_disk(): void
     {
-        Storage::fake('public');
+        Storage::fake();
         $user = User::factory()->create();
 
         $this->actingAs($user, 'sanctum')
@@ -314,7 +314,7 @@ class AuthenticationApiTest extends TestCase
         $avatarPath = $user->fresh()->avatar_path;
 
         $this->assertNotNull($avatarPath);
-        $this->assertTrue(Storage::disk('public')->exists($avatarPath));
+        $this->assertTrue(Storage::disk()->exists($avatarPath));
         $this->assertDatabaseHas('users', [
             'id' => $user->id,
             'avatar' => $avatarPath,

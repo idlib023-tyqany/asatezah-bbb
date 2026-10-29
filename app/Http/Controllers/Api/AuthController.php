@@ -4,15 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\FileStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
-use RuntimeException;
 use Throwable;
 
 class AuthController extends Controller
@@ -164,12 +163,7 @@ class AuthController extends Controller
 
         try {
             if ($request->hasFile('avatar')) {
-                $uploadedAvatarPath = $request->file('avatar')->store('avatars', 'public');
-
-                if ($uploadedAvatarPath === false) {
-                    throw new RuntimeException('Unable to store the uploaded avatar.');
-                }
-
+                $uploadedAvatarPath = FileStorage::store($request->file('avatar'), 'avatars');
                 $newAvatarPath = $uploadedAvatarPath;
                 unset($validated['avatar']);
                 $validated['avatar_path'] = $newAvatarPath;
@@ -180,12 +174,12 @@ class AuthController extends Controller
                 $user->save();
             });
 
-            $publicDisk = Storage::disk('public');
+            $disk = FileStorage::disk();
             if (
                 $newAvatarPath !== null
                 && ! empty($oldAvatarPath)
-                && $publicDisk->exists($oldAvatarPath)
-                && ! $publicDisk->delete($oldAvatarPath)
+                && $disk->exists($oldAvatarPath)
+                && ! $disk->delete($oldAvatarPath)
             ) {
                 Log::warning("AuthController: Failed to remove replaced avatar for user ID {$user->id}.");
             }
@@ -195,7 +189,7 @@ class AuthController extends Controller
                 'user' => $this->userPayload($user->fresh()),
             ]);
         } catch (Throwable $e) {
-            if ($newAvatarPath !== null && ! Storage::disk('public')->delete($newAvatarPath)) {
+            if ($newAvatarPath !== null && ! FileStorage::disk()->delete($newAvatarPath)) {
                 Log::error("AuthController: Failed to clean up uploaded avatar for user ID {$user->id}.");
             }
 
@@ -261,8 +255,8 @@ class AuthController extends Controller
         try {
             DB::transaction(function () use ($user) {
                 // إزالة الصورة وملفات التوكنات وحذف الحساب نهائياً
-                if (! empty($user->avatar_path) && Storage::disk('public')->exists($user->avatar_path)) {
-                    Storage::disk('public')->delete($user->avatar_path);
+                if (! empty($user->avatar_path) && FileStorage::disk()->exists($user->avatar_path)) {
+                    FileStorage::disk()->delete($user->avatar_path);
                 }
 
                 $user->tokens()->delete();
@@ -282,7 +276,7 @@ class AuthController extends Controller
     private function userPayload(User $user): array
     {
         // استخدام asset() لضمان توليد URL كامل ومستقر لصورة الـ Avatar لتطبيق Flutter
-        $avatarUrl = ! empty($user->avatar_path) ? asset('storage/'.$user->avatar_path) : null;
+        $avatarUrl = FileStorage::url($user->avatar_path);
 
         return [
             'id' => $user->id,

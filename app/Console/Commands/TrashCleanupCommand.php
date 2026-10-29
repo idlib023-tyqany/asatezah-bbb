@@ -20,7 +20,7 @@ class TrashCleanupCommand extends Command
     protected $signature = 'trash:cleanup
                             {--days=30 : Number of days files must be in trash before permanent deletion}
                             {--dry-run : Simulate the cleanup process without permanently deleting files}
-                            {--disk=public : The storage disk to delete files from}';
+                            {--disk= : The storage disk to delete files from}';
 
     /**
      * The console command description.
@@ -36,7 +36,7 @@ class TrashCleanupCommand extends Command
     {
         $days = (int) $this->option('days');
         $isDryRun = $this->option('dry-run');
-        $diskName = $this->option('disk');
+        $diskName = $this->option('disk') ?: config('filesystems.default');
 
         $cutoff = Carbon::now()->subDays($days);
 
@@ -46,6 +46,7 @@ class TrashCleanupCommand extends Command
 
         if ($totalCount === 0) {
             $this->info("No trashed files older than {$days} days found to clean up.");
+
             return self::SUCCESS;
         }
 
@@ -61,10 +62,11 @@ class TrashCleanupCommand extends Command
 
             $this->table(
                 ['ID', 'Path', 'Deleted At'],
-                $sample->map(fn($file) => [$file->id, $file->path, $file->deleted_at])->toArray()
+                $sample->map(fn ($file) => [$file->id, $file->path, $file->deleted_at])->toArray()
             );
 
-            $this->info("No changes were made.");
+            $this->info('No changes were made.');
+
             return self::SUCCESS;
         }
 
@@ -119,7 +121,7 @@ class TrashCleanupCommand extends Command
         Log::info("TrashCleanup completed. Permanently deleted: {$deletedCount}, Failed: {$failedCount}.");
 
         // عرض تقرير نهائي احترافي على شكل جدول
-        $this->info("Trash cleanup process finished successfully!");
+        $this->info('Trash cleanup process finished successfully!');
         $this->table(
             ['Metric', 'Count'],
             [

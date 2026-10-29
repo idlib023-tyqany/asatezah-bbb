@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\FileResource;
 use App\Models\File;
+use App\Support\FileStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
@@ -61,11 +61,7 @@ class UploadController extends Controller
             'This file has already been uploaded.'
         );
 
-        $path = $uploadedFile->store($directory, 'public');
-
-        if ($path === false) {
-            throw new RuntimeException('Unable to store the uploaded file.');
-        }
+        $path = FileStorage::store($uploadedFile, $directory);
 
         try {
             $file = DB::transaction(function () use ($validated, $user, $uploadedFile, $mimeType, $contentHash, $path) {
@@ -84,7 +80,7 @@ class UploadController extends Controller
                 ]);
             });
         } catch (Throwable $exception) {
-            Storage::disk('public')->delete($path);
+            FileStorage::disk()->delete($path);
 
             throw $exception;
         }

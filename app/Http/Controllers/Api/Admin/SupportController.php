@@ -27,7 +27,7 @@ class SupportController extends Controller
             'latestMessage',
         ])->withCount(['messages as unread_messages_count' => function ($query) {
             $query->whereNull('read_at')
-                ->whereHas('sender', fn($senderQuery) => $senderQuery->where('role', '!=', User::ROLE_ADMIN));
+                ->whereHas('sender', fn ($senderQuery) => $senderQuery->where('role', '!=', User::ROLE_ADMIN));
         }]);
 
         // فلترة بحسب الحالة أو التخصيص
@@ -69,7 +69,7 @@ class SupportController extends Controller
         $conversation->load([
             'user:id,name,email,avatar',
             'admin:id,name',
-            'messages' => fn($q) => $q->orderBy('created_at', 'asc'),
+            'messages' => fn ($q) => $q->orderBy('created_at', 'asc'),
         ]);
 
         return response()->json(['data' => $conversation]);

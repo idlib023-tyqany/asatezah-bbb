@@ -16,7 +16,9 @@ class File extends Model
     use HasFactory, SoftDeletes;
 
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_PUBLISHED = 'published';
+
     public const STATUS_REJECTED = 'rejected';
 
     /**

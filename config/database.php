@@ -17,7 +17,7 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    'default' => env('DB_CONNECTION', 'pgsql'),
 
     /*
     |--------------------------------------------------------------------------
@@ -86,20 +86,20 @@ return [
 
         'pgsql' => [
             'driver' => 'pgsql',
-            'url' => env('DATABASE_URL'),
+            'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
-            'database' => env('DB_DATABASE', 'forge'),
-            'username' => env('DB_USERNAME', 'forge'),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('DB_USERNAME', 'root'),
             'password' => env('DB_PASSWORD', ''),
-            'charset' => 'utf8',
+            'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => 'public',
-            'sslmode' => 'prefer',
-            // أضف هذا السطر هنا لفرض استخدام IPv4 أو حل مشاكل الـ Socket:
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // أضف هذا السطر لضمان توافق الاتصال مع الـ Pooler:
             'options' => [
-                PDO::ATTR_TIMEOUT => 30,
+                PDO::ATTR_PERSISTENT => false,
             ],
         ],
 

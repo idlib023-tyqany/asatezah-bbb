@@ -20,7 +20,7 @@ class SupportCleanupCommand extends Command
     protected $signature = 'support:cleanup
                             {--days=60 : Number of days old messages must be to be deleted}
                             {--dry-run : Simulate the cleanup process without actually deleting data}
-                            {--disk=public : The storage disk to delete images from}';
+                            {--disk= : The storage disk to delete images from}';
 
     /**
      * The console command description.
@@ -36,7 +36,7 @@ class SupportCleanupCommand extends Command
     {
         $days = (int) $this->option('days');
         $isDryRun = $this->option('dry-run');
-        $diskName = $this->option('disk');
+        $diskName = $this->option('disk') ?: config('filesystems.default');
 
         $cutoff = Carbon::now()->subDays($days);
 
@@ -46,6 +46,7 @@ class SupportCleanupCommand extends Command
 
         if ($totalCount === 0) {
             $this->info("No support messages older than {$days} days found to clean up.");
+
             return self::SUCCESS;
         }
 
@@ -58,10 +59,11 @@ class SupportCleanupCommand extends Command
 
             $this->table(
                 ['ID', 'Created At', 'Image Path'],
-                $sample->map(fn($msg) => [$msg->id, $msg->created_at, $msg->image_path ?? 'No Image'])->toArray()
+                $sample->map(fn ($msg) => [$msg->id, $msg->created_at, $msg->image_path ?? 'No Image'])->toArray()
             );
 
-            $this->info("No changes were made.");
+            $this->info('No changes were made.');
+
             return self::SUCCESS;
         }
 
@@ -111,7 +113,7 @@ class SupportCleanupCommand extends Command
         Log::info("SupportCleanup completed. Deleted: {$deletedCount}, Failed: {$failedCount}.");
 
         // عرض تقرير نهائي احترافي على شكل جدول
-        $this->info("Cleanup process finished successfully!");
+        $this->info('Cleanup process finished successfully!');
         $this->table(
             ['Metric', 'Count'],
             [

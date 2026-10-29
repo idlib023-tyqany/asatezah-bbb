@@ -21,6 +21,75 @@ Laravel is a web application framework with expressive, elegant syntax. We belie
 
 Laravel is accessible, powerful, and provides tools required for large, robust applications.
 
+## Database and file storage
+
+The application selects its database with `DB_CONNECTION` and its file disk with
+`FILESYSTEM_DISK`. File uploads, deletes, URLs, and downloads use the configured
+default disk; changing providers does not require application-code changes.
+
+### File storage
+
+Storage is independent of the Supabase database. The application uses Laravel's
+Flysystem abstraction and `FILESYSTEM_DISK`, so changing between local storage
+and an S3-compatible provider does not require code changes.
+
+- Local: `FILESYSTEM_DISK=local`; files are written under `storage/app/public`.
+- Amazon S3 or another S3-compatible service: `FILESYSTEM_DISK=s3` and set
+  `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, and
+  `AWS_BUCKET`. Set `AWS_ENDPOINT` for a custom provider, and
+  `AWS_USE_PATH_STYLE_ENDPOINT=true` for providers such as MinIO when required.
+  `AWS_URL` is optional and can provide a public/CDN URL.
+
+The S3 Flysystem adapter is already included in Composer dependencies.
+
+### PostgreSQL / Supabase Database
+
+Set `DB_CONNECTION=pgsql`, then take the host and username directly from
+Supabase Dashboard > Connect > Session pooler. Supabase's shared Session Pooler
+uses port `5432`; port `6543` is Transaction Pooler, not Session Pooler. For a
+persistent Laravel backend, use Session Pooler when that is the intended mode.
+Set `DB_PORT=5432`, `DB_DATABASE=postgres`, `DB_PASSWORD`, and
+`DB_SSLMODE=require`. Alternatively, set `DB_URL` using the connection string
+from the dashboard. Do not set `DB_URL` together with individual `DB_*` values.
+When using individual variables, quote a password containing `#`, spaces, or
+other dotenv syntax characters:
+
+```dotenv
+DB_PASSWORD="password-containing-special-characters"
+```
+
+When using a PostgreSQL connection URI in `DB_URL`, percent-encode reserved
+characters in the username or password. Shared pooler usernames include the
+project reference (for example, `postgres.<project-ref>`); use the exact values
+shown in the dashboard.
+
+After changing environment settings, run these commands from `backend`:
+
+```powershell
+php artisan optimize:clear
+php artisan migrate:status
+php artisan migrate --pretend
+php artisan migrate --force
+php artisan migrate:status
+php artisan test --filter=UploadApiTest
+```
+
+`migrate` creates/applies the schema on the configured Supabase database; it
+does not copy existing user records from another database. Back up existing
+data and plan a separate export/import if records also need to be transferred.
+Do not use `migrate:fresh` on a database containing data.
+
+To check that the selected disk can upload, read, and delete an object without
+printing its contents:
+
+```powershell
+php artisan tinker --execute='$disk = Illuminate\Support\Facades\Storage::disk(config("filesystems.default")); $path = "health-check.txt"; $stored = $disk->put($path, "storage-ok"); if (! $stored || $disk->get($path) !== "storage-ok") { throw new RuntimeException("Storage check failed."); } $disk->delete($path); echo "Storage check passed."'
+```
+
+`migrate:status` and `migrate --pretend` verify that Laravel can connect to the
+selected database; run `php artisan migrate` only when you are ready to apply
+pending schema changes.
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.

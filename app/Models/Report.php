@@ -14,7 +14,9 @@ class Report extends Model
     use HasFactory;
 
     public const STATUS_OPEN = 'open';
+
     public const STATUS_RESOLVED = 'resolved';
+
     public const STATUS_DISMISSED = 'dismissed';
 
     /**

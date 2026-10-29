@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\FileStorage;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -28,9 +29,7 @@ class FileResource extends JsonResource
 
             // URLs المباشرة لتطبيق Flutter باستخدام asset()
             'download_url' => route('api.files.download', ['file' => $this->id]),
-            'cover_image_url' => $this->thumbnail
-                ? asset('storage/' . $this->thumbnail)
-                : null,
+            'cover_image_url' => FileStorage::url($this->thumbnail),
 
             // العلاقات الحماية ضد N+1 Query
             'category' => $this->whenLoaded('category', function () {
@@ -52,9 +51,7 @@ class FileResource extends JsonResource
                     'id' => $this->user->id,
                     'name' => $this->user->name,
                     'role' => $this->user->role ?? 'teacher',
-                    'avatar_url' => $this->user->avatar_path
-                        ? asset('storage/' . $this->user->avatar_path)
-                        : null,
+                    'avatar_url' => FileStorage::url($this->user->avatar_path),
                 ];
             }),
 
@@ -115,9 +112,9 @@ class FileResource extends JsonResource
         }
 
         if ($bytes >= 1048576) {
-            return number_format($bytes / 1048576, 2) . ' MB';
+            return number_format($bytes / 1048576, 2).' MB';
         }
 
-        return number_format($bytes / 1024, 1) . ' KB';
+        return number_format($bytes / 1024, 1).' KB';
     }
 }

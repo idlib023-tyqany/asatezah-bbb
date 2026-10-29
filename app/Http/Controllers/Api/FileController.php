@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\FileResource;
 use App\Models\File;
+use App\Support\FileStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class FileController extends Controller
@@ -141,7 +141,9 @@ class FileController extends Controller
         abort_unless($file->isPublished(), 404, 'File not found or not published.');
 
         // التحقق الآمن من وجود الملف على القرص
-        if (! $file->path || ! Storage::disk('public')->exists($file->path)) {
+        $disk = FileStorage::disk();
+
+        if (! $file->path || ! $disk->exists($file->path)) {
             abort(404, 'The requested file could not be found on the storage server.');
         }
 
@@ -152,10 +154,8 @@ class FileController extends Controller
             });
 
             $downloadFilename = $file->filename ?? basename($file->path);
-            $fullPath = Storage::disk('public')->path($file->path);
 
-            // إرجاع الملف عبر response()->download باستخدام المسار المباشر
-            return response()->download($fullPath, $downloadFilename);
+            return $disk->download($file->path, $downloadFilename);
         } catch (Throwable $e) {
             Log::error("FileController: Failed to download file ID {$file->id}. Error: {$e->getMessage()}");
 

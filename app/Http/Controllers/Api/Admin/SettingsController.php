@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Api\AppInfoController;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
+use App\Support\FileStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class SettingsController extends Controller
@@ -51,7 +51,7 @@ class SettingsController extends Controller
 
         // تحويل مسار اللوجو إلى URL كامل باستخدام asset() لضمان عمله بسلاسة تامة
         if (! empty($settings['logo_path'])) {
-            $settings['logo_url'] = asset('storage/' . $settings['logo_path']);
+            $settings['logo_url'] = FileStorage::url($settings['logo_path']);
         } else {
             $settings['logo_url'] = null;
         }
@@ -88,7 +88,7 @@ class SettingsController extends Controller
 
             // إفراغ الـ Cache ليتم تحديث البيانات فوراً
             Cache::forget(self::CACHE_KEY);
-            if (class_exists(AppInfoController::class) && defined(AppInfoController::class . '::CACHE_KEY')) {
+            if (class_exists(AppInfoController::class) && defined(AppInfoController::class.'::CACHE_KEY')) {
                 Cache::forget(AppInfoController::CACHE_KEY);
             }
 
@@ -120,18 +120,18 @@ class SettingsController extends Controller
             DB::transaction(function () use ($request, &$path) {
                 // جلب الشعار القديم وحذفه لتوفير المساحة
                 $oldLogo = Setting::get('logo_path');
-                if (! empty($oldLogo) && Storage::disk('public')->exists($oldLogo)) {
-                    Storage::disk('public')->delete($oldLogo);
+                if (! empty($oldLogo) && FileStorage::disk()->exists($oldLogo)) {
+                    FileStorage::disk()->delete($oldLogo);
                 }
 
                 // تخزين الشعار الجديد
-                $path = $request->file('logo')->store('logos', 'public');
+                $path = FileStorage::store($request->file('logo'), 'logos');
                 Setting::set('logo_path', $path);
             });
 
             // إفراغ الـ Cache
             Cache::forget(self::CACHE_KEY);
-            if (class_exists(AppInfoController::class) && defined(AppInfoController::class . '::CACHE_KEY')) {
+            if (class_exists(AppInfoController::class) && defined(AppInfoController::class.'::CACHE_KEY')) {
                 Cache::forget(AppInfoController::CACHE_KEY);
             }
 
@@ -140,7 +140,7 @@ class SettingsController extends Controller
                 'message' => 'Logo uploaded successfully.',
                 'data' => [
                     'logo_path' => $path,
-                    'logo_url' => asset('storage/' . $path),
+                    'logo_url' => FileStorage::url($path),
                 ],
             ]);
         } catch (Throwable $e) {

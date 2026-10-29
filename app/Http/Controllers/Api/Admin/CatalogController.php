@@ -267,7 +267,7 @@ class CatalogController extends Controller
         $originalSlug = $slug;
         $count = 1;
 
-        while ($modelClass::where('slug', $slug)->when($ignoreId, fn($q) => $q->where('id', '!=', $ignoreId))->exists()) {
+        while ($modelClass::where('slug', $slug)->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))->exists()) {
             $slug = "{$originalSlug}-{$count}";
             $count++;
         }

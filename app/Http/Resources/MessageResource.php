@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\FileStorage;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -23,9 +24,7 @@ class MessageResource extends JsonResource
             'image_path' => $this->image_path,
 
             // توليد URL الصورة المرفقة باستخدام asset() لضمان الاستقرار في تطبيق Flutter
-            'image_url' => $this->image_path
-                ? asset('storage/' . $this->image_path)
-                : null,
+            'image_url' => FileStorage::url($this->image_path),
 
             // تحديد ما إذا كانت الرسالة ملك للمستخدم الحالي
             'is_mine' => $currentUser ? $this->sender_id === $currentUser->id : false,
@@ -41,9 +40,7 @@ class MessageResource extends JsonResource
                     'id' => $this->sender->id,
                     'name' => $this->sender->name,
                     'is_admin' => $isAdmin,
-                    'avatar_url' => $this->sender->avatar_path
-                        ? asset('storage/' . $this->sender->avatar_path)
-                        : null,
+                    'avatar_url' => FileStorage::url($this->sender->avatar_path),
                 ];
             }),
 
