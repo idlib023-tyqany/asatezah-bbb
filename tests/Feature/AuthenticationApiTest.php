@@ -3,9 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Notifications\VerificationCodeNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -13,7 +17,19 @@ class AuthenticationApiTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_login_returns_a_token_and_user_payload(): void
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'services.sms.endpoint' => 'https://sms.example.test/messages',
+            'services.sms.token' => 'test-token',
+        ]);
+        Http::fake();
+        Notification::fake();
+    }
+
+    public function test_login_requires_both_codes_before_returning_a_token(): void
     {
         $user = User::factory()->create([
             'email' => 'login@example.com',
@@ -27,7 +43,21 @@ class AuthenticationApiTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertJsonStructure(['token', 'user' => ['id', 'email', 'role']]);
+            ->assertJsonPath('purpose', 'login')
+            ->assertJsonPath('channels', ['email', 'phone'])
+            ->assertJsonMissingPath('token');
+
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+        $this->assertDatabaseCount('verification_challenges', 1);
+        Notification::assertSentOnDemand(VerificationCodeNotification::class);
+        Http::assertSent(fn ($request): bool => $request->url() === 'https://sms.example.test/messages');
+
+        $this->postJson('/api/verification/confirm', [
+            'verification_id' => $response->json('verification_id'),
+            'email_code' => $this->sentEmailCode(),
+            'phone_code' => $this->sentPhoneCode(),
+        ])->assertOk()
+            ->assertJsonStructure(['token', 'user' => ['email', 'phone_number']]);
 
         $this->assertDatabaseCount('personal_access_tokens', 1);
     }
@@ -47,6 +77,27 @@ class AuthenticationApiTest extends TestCase
             ->assertJson(['message' => 'The provided credentials are incorrect.']);
     }
 
+    public function test_social_auth_routes_are_not_available(): void
+    {
+        $routes = collect(Route::getRoutes()->getRoutes());
+
+        foreach ([
+            'api/auth/google',
+            'api/auth/facebook',
+        ] as $uri) {
+            $this->assertFalse($routes->contains(
+                fn ($route): bool => $route->uri() === $uri
+                    && in_array('POST', $route->methods(), true)
+            ));
+        }
+    }
+
+    public function test_users_table_does_not_have_social_auth_columns(): void
+    {
+        $this->assertFalse(Schema::hasColumn('users', 'provider'));
+        $this->assertFalse(Schema::hasColumn('users', 'provider_id'));
+    }
+
     public function test_login_normalizes_email_case(): void
     {
         User::factory()->create([
@@ -59,7 +110,10 @@ class AuthenticationApiTest extends TestCase
             'password' => 'password',
         ])
             ->assertOk()
-            ->assertJsonPath('user.email', 'login@example.com');
+            ->assertJsonPath('purpose', 'login');
+
+        $this->assertDatabaseHas('verification_challenges', ['email' => 'login@example.com']);
+        $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 
     public function test_register_persists_the_user_and_returns_a_token(): void
@@ -67,6 +121,7 @@ class AuthenticationApiTest extends TestCase
         $response = $this->postJson('/api/register', [
             'name' => 'New User',
             'email' => 'new@example.com',
+            'phone_number' => '+963912345678',
             'password' => 'password',
             'password_confirmation' => 'password',
             'specialization' => 'Mathematics',
@@ -74,25 +129,36 @@ class AuthenticationApiTest extends TestCase
 
         $response
             ->assertCreated()
-            ->assertJsonStructure(['token', 'user' => ['id', 'email', 'specialization']]);
+            ->assertJsonPath('purpose', 'register')
+            ->assertJsonPath('channels', ['email', 'phone'])
+            ->assertJsonMissingPath('token');
 
         $this->assertDatabaseHas('users', [
             'email' => 'new@example.com',
+            'phone_number' => '+963912345678',
             'specialization' => 'Mathematics',
+            'is_active' => false,
+            'email_verified_at' => null,
+            'phone_verified_at' => null,
         ]);
+        $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 
     public function test_register_normalizes_email_and_rejects_case_insensitive_duplicates(): void
     {
         $this->postJson('/api/register', [
             'email' => '  New.User@Example.com ',
+            'phone_number' => '+963912345678',
             'password' => 'password',
             'password_confirmation' => 'password',
         ])->assertCreated()
-            ->assertJsonPath('user.email', 'new.user@example.com');
+            ->assertJsonPath('purpose', 'register');
+
+        $this->assertDatabaseHas('users', ['email' => 'new.user@example.com']);
 
         $this->postJson('/api/register', [
             'email' => 'NEW.USER@example.com',
+            'phone_number' => '+963912345679',
             'password' => 'password',
             'password_confirmation' => 'password',
         ])->assertUnprocessable()
@@ -106,124 +172,54 @@ class AuthenticationApiTest extends TestCase
         $this->postJson('/api/register', [
             'name' => 'New Teacher',
             'email' => 'teacher@example.com',
+            'phone_number' => '+963912345678',
             'password' => 'password',
             'password_confirmation' => 'password',
             'display_name' => 'Teacher',
-            'phone_number' => '+963900000000',
             'trainer_type' => 'subject_teacher',
         ])->assertCreated();
 
         $this->assertDatabaseHas('users', [
             'email' => 'teacher@example.com',
             'display_name' => 'Teacher',
-            'phone_number' => '+963900000000',
+            'phone_number' => '+963912345678',
             'trainer_type' => 'subject_teacher',
         ]);
     }
 
-    public function test_google_sign_in_verifies_the_provider_token_and_creates_an_account(): void
+    public function test_registration_issues_a_token_only_after_both_codes_are_verified(): void
     {
-        config(['services.google.client_id' => 'web-client-id']);
-        Http::fake([
-            'oauth2.googleapis.com/tokeninfo*' => Http::response([
-                'aud' => 'web-client-id',
-                'iss' => 'https://accounts.google.com',
-                'email' => 'Teacher@Example.com',
-                'email_verified' => 'true',
-                'sub' => 'google-user-123',
-                'exp' => now()->addHour()->timestamp,
-                'name' => 'Google Teacher',
-            ]),
-        ]);
+        $registration = $this->postJson('/api/register', [
+            'email' => 'verified@example.com',
+            'phone_number' => '+963912345678',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+        ])->assertCreated();
 
-        $response = $this->postJson('/api/auth/google', ['id_token' => 'valid-id-token']);
+        $emailCode = $this->sentEmailCode();
+        $phoneCode = $this->sentPhoneCode();
 
-        $response
-            ->assertOk()
-            ->assertJsonPath('user.email', 'teacher@example.com')
-            ->assertJsonPath('user.name', 'Google Teacher')
-            ->assertJsonStructure(['token', 'user' => ['id', 'email', 'role']]);
+        $this->postJson('/api/verification/confirm', [
+            'verification_id' => $registration->json('verification_id'),
+            'email_code' => $emailCode,
+        ])->assertUnprocessable();
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+
+        $this->postJson('/api/verification/confirm', [
+            'verification_id' => $registration->json('verification_id'),
+            'email_code' => $emailCode,
+            'phone_code' => $phoneCode,
+        ])->assertOk()
+            ->assertJsonStructure(['token', 'user' => ['email_verified', 'phone_verified']])
+            ->assertJsonPath('user.email_verified', true)
+            ->assertJsonPath('user.phone_verified', true);
 
         $this->assertDatabaseHas('users', [
-            'email' => 'teacher@example.com',
-            'email_verified_at' => now()->toDateTimeString(),
+            'email' => 'verified@example.com',
+            'is_active' => true,
         ]);
         $this->assertDatabaseCount('personal_access_tokens', 1);
-    }
-
-    public function test_google_sign_in_rejects_a_token_for_a_different_oauth_client(): void
-    {
-        config(['services.google.client_id' => 'web-client-id']);
-        Http::fake([
-            'oauth2.googleapis.com/tokeninfo*' => Http::response([
-                'aud' => 'another-client-id',
-                'iss' => 'https://accounts.google.com',
-                'email' => 'teacher@example.com',
-                'email_verified' => 'true',
-                'sub' => 'google-user-123',
-                'exp' => now()->addHour()->timestamp,
-            ]),
-        ]);
-
-        $this->postJson('/api/auth/google', ['id_token' => 'invalid-id-token'])
-            ->assertUnauthorized();
-
-        $this->assertDatabaseCount('users', 0);
-    }
-
-    public function test_facebook_sign_in_validates_the_app_token_and_creates_an_account(): void
-    {
-        config([
-            'services.facebook.app_id' => 'facebook-app-id',
-            'services.facebook.client_secret' => 'facebook-app-secret',
-        ]);
-        Http::fake([
-            'graph.facebook.com/debug_token*' => Http::response([
-                'data' => [
-                    'is_valid' => true,
-                    'app_id' => 'facebook-app-id',
-                    'user_id' => 'facebook-user-123',
-                    'expires_at' => now()->addHour()->timestamp,
-                ],
-            ]),
-            'graph.facebook.com/me*' => Http::response([
-                'id' => 'facebook-user-123',
-                'name' => 'Facebook Teacher',
-                'email' => 'Teacher@Example.com',
-            ]),
-        ]);
-
-        $this->postJson('/api/auth/facebook', ['access_token' => 'valid-access-token'])
-            ->assertOk()
-            ->assertJsonPath('user.email', 'teacher@example.com')
-            ->assertJsonPath('user.name', 'Facebook Teacher')
-            ->assertJsonStructure(['token', 'user' => ['id', 'email', 'role']]);
-
-        $this->assertDatabaseHas('users', ['email' => 'teacher@example.com']);
-        $this->assertDatabaseCount('personal_access_tokens', 1);
-    }
-
-    public function test_facebook_sign_in_rejects_a_token_issued_to_another_app(): void
-    {
-        config([
-            'services.facebook.app_id' => 'facebook-app-id',
-            'services.facebook.client_secret' => 'facebook-app-secret',
-        ]);
-        Http::fake([
-            'graph.facebook.com/debug_token*' => Http::response([
-                'data' => [
-                    'is_valid' => true,
-                    'app_id' => 'another-facebook-app',
-                    'user_id' => 'facebook-user-123',
-                    'expires_at' => now()->addHour()->timestamp,
-                ],
-            ]),
-        ]);
-
-        $this->postJson('/api/auth/facebook', ['access_token' => 'wrong-app-token'])
-            ->assertUnauthorized();
-
-        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('verification_challenges', 0);
     }
 
     public function test_authenticated_api_requests_accept_the_issued_token(): void
@@ -234,7 +230,7 @@ class AuthenticationApiTest extends TestCase
         $this->withToken($token)
             ->getJson('/api/user')
             ->assertOk()
-            ->assertJsonPath('email', $user->email);
+            ->assertJsonPath('user.email', $user->email);
     }
 
     public function test_protected_api_requests_require_authentication(): void
@@ -279,7 +275,7 @@ class AuthenticationApiTest extends TestCase
 
     public function test_logout_all_revokes_every_session(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['email' => 'login@example.com']);
         $activeToken = $user->createToken('active')->plainTextToken;
         $user->createToken('other');
 
@@ -319,5 +315,108 @@ class AuthenticationApiTest extends TestCase
             'id' => $user->id,
             'avatar' => $avatarPath,
         ]);
+    }
+
+    public function test_profile_contact_changes_are_not_saved_until_the_new_destination_is_verified(): void
+    {
+        $user = User::factory()->create(['email' => 'login@example.com']);
+        $token = $user->createToken('test-token')->plainTextToken;
+
+        $challenge = $this->withToken($token)->postJson('/api/profile/contact-change', [
+            'email' => 'updated@example.com',
+        ])->assertAccepted()
+            ->assertJsonPath('channels', ['email']);
+
+        $this->assertSame('login@example.com', $user->fresh()->email);
+        $emailCode = $this->sentEmailCode();
+
+        $this->withToken($token)->postJson('/api/profile/contact-change/verify', [
+            'verification_id' => $challenge->json('verification_id'),
+            'email_code' => $emailCode,
+        ])->assertOk()
+            ->assertJsonPath('user.email', 'updated@example.com')
+            ->assertJsonPath('user.email_verified', true);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'email' => 'updated@example.com',
+        ]);
+    }
+
+    public function test_profile_phone_changes_are_not_saved_until_the_new_number_is_verified(): void
+    {
+        $user = User::factory()->create(['phone_number' => '+963900000001']);
+        $token = $user->createToken('test-token')->plainTextToken;
+
+        $challenge = $this->withToken($token)->postJson('/api/profile/contact-change', [
+            'phone_number' => '+963900000002',
+        ])->assertAccepted()
+            ->assertJsonPath('channels', ['phone']);
+
+        $phoneCode = $this->sentPhoneCode();
+
+        $this->withToken($token)->postJson('/api/profile/contact-change/verify', [
+            'verification_id' => $challenge->json('verification_id'),
+            'phone_code' => $phoneCode,
+        ])->assertOk()
+            ->assertJsonPath('user.phone_number', '+963900000002')
+            ->assertJsonPath('user.phone_verified', true);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'phone_number' => '+963900000002',
+        ]);
+    }
+
+    public function test_profile_email_and_phone_cannot_bypass_contact_verification(): void
+    {
+        $user = User::factory()->create(['email' => 'login@example.com']);
+        $token = $user->createToken('test-token')->plainTextToken;
+
+        $this->withToken($token)->putJson('/api/profile/update', [
+            'email' => 'unverified@example.com',
+            'phone_number' => '+963900000002',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['email', 'phone_number']);
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'email' => 'login@example.com',
+            'phone_number' => $user->phone_number,
+        ]);
+    }
+
+    private function sentEmailCode(): string
+    {
+        $code = null;
+
+        Notification::assertSentOnDemand(
+            VerificationCodeNotification::class,
+            function (VerificationCodeNotification $notification) use (&$code): bool {
+                $code = $notification->code;
+
+                return true;
+            },
+        );
+
+        $this->assertNotNull($code);
+
+        return $code;
+    }
+
+    private function sentPhoneCode(): string
+    {
+        $code = null;
+
+        Http::assertSent(function ($request) use (&$code): bool {
+            preg_match('/(\d{6})/', $request['message'], $matches);
+            $code = $matches[1] ?? null;
+
+            return true;
+        });
+
+        $this->assertNotNull($code);
+
+        return $code;
     }
 }

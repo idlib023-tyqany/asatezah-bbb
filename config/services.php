@@ -38,21 +38,22 @@ return [
     | Educational Platform Third-Party Integrations
     |--------------------------------------------------------------------------
     |
-    | Additional configurations for Firebase notifications and Social Login.
+    | Additional configuration for Firebase Cloud Messaging notifications.
     |
     */
 
-    'google' => [
-        'client_id' => env('GOOGLE_CLIENT_ID'),
-    ],
-
-    'facebook' => [
-        'app_id' => env('FACEBOOK_APP_ID'),
-        'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN'),
     ],
 
     'fcm' => [
         'server_key' => env('FCM_SERVER_KEY'),
+    ],
+
+    'sms' => [
+        'endpoint' => env('SMS_API_ENDPOINT'),
+        'token' => env('SMS_API_TOKEN'),
+        'sender' => env('SMS_SENDER'),
     ],
 
 ];

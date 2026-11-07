@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +13,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory */
+    /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
     // أدوار المستخدمين
@@ -38,6 +39,7 @@ class User extends Authenticatable
         'display_name',
         'phone_number',
         'trainer_type',
+        'is_active',
         'fcm_token', // للربط مع إشعارات التطبيق المستقبلية
     ];
 
@@ -60,6 +62,7 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'phone_verified_at' => 'datetime',
             'password' => 'hashed',
             'can_contribute' => 'boolean',
             'is_active' => 'boolean',

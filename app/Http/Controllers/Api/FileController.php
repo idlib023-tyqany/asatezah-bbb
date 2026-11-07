@@ -6,14 +6,102 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\FileResource;
 use App\Models\File;
 use App\Support\FileStorage;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 class FileController extends Controller
 {
+    /**
+     * Upload a file and associate it with a folder.
+     */
+    public function store(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user->canContribute(), 403, 'Your account is not allowed to upload files.');
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'category_id' => ['nullable', 'integer', 'exists:categories,id'],
+            'material_id' => ['nullable', 'integer', 'exists:materials,id'],
+            'folder_id' => ['nullable', 'integer', 'exists:folders,id'],
+            'file' => [
+                'required',
+                'file',
+                'mimes:mp4,mov,avi,mkv,webm,pdf,doc,docx,xls,xlsx,jpg,jpeg,png,gif,webp',
+                'max:51200',
+            ],
+        ]);
+
+        $uploadedFile = $request->file('file');
+        $mimeType = $uploadedFile->getMimeType() ?? '';
+        $directory = match (true) {
+            str_starts_with($mimeType, 'video/') => 'videos',
+            str_starts_with($mimeType, 'image/') => 'images',
+            in_array($mimeType, [
+                'application/pdf',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ], true) => 'documents',
+            default => abort(422, 'The uploaded file type is not supported.'),
+        };
+        $contentHash = hash_file('sha256', $uploadedFile->getRealPath());
+
+        if ($contentHash === false) {
+            throw new RuntimeException('Unable to calculate the uploaded file hash.');
+        }
+
+        abort_if(
+            File::query()->where('content_hash', $contentHash)->exists(),
+            409,
+            'This file has already been uploaded.'
+        );
+
+        $path = FileStorage::store($uploadedFile, $directory);
+
+        try {
+            $file = DB::transaction(function () use ($validated, $user, $uploadedFile, $mimeType, $contentHash, $path) {
+                return File::create([
+                    'uploaded_by' => $user->id,
+                    'category_id' => $validated['category_id'] ?? null,
+                    'material_id' => $validated['material_id'] ?? null,
+                    'folder_id' => $validated['folder_id'] ?? null,
+                    'title' => $validated['title'],
+                    'description' => $validated['description'] ?? null,
+                    'filename' => basename($uploadedFile->getClientOriginalName()),
+                    'path' => $path,
+                    'file_type' => $mimeType,
+                    'mime_type' => $mimeType,
+                    'file_size' => $uploadedFile->getSize(),
+                    'content_hash' => $contentHash,
+                    'status' => File::STATUS_PENDING,
+                ]);
+            });
+        } catch (Throwable $exception) {
+            FileStorage::disk()->delete($path);
+
+            throw $exception;
+        }
+
+        return response()->json([
+            'message' => 'File uploaded successfully and is awaiting review.',
+            'data' => new FileResource($file->load([
+                'category:id,name,slug',
+                'material:id,name,slug',
+                'user:id,name,avatar,role',
+            ])),
+        ], 201);
+    }
+
     /**
      * Display a paged listing of published files with filters & search.
      *
@@ -164,5 +252,84 @@ class FileController extends Controller
                 'message' => 'Failed to download the file.',
             ], 500);
         }
+    }
+
+    /**
+     * Resolve a Telegram file ID to this application's protected download URL.
+     */
+    public function getDownloadUrl(string $id): JsonResponse
+    {
+        $this->getTelegramFilePath($id);
+
+        return response()->json([
+            'download_url' => route('api.files.telegram.download', ['id' => $id]),
+        ]);
+    }
+
+    /**
+     * Download a Telegram file without exposing the bot token to the client.
+     */
+    public function downloadTelegramFile(string $id)
+    {
+        $filePath = $this->getTelegramFilePath($id);
+        $token = config('services.telegram.bot_token');
+
+        try {
+            $download = Http::timeout(60)
+                ->get("https://api.telegram.org/file/bot{$token}/{$filePath}");
+        } catch (ConnectionException) {
+            Log::warning('Telegram file download request failed.');
+
+            abort(502, 'The file could not be downloaded from Telegram.');
+        }
+
+        if (! $download->successful()) {
+            Log::warning('Telegram file download returned an unsuccessful response.', [
+                'status' => $download->status(),
+            ]);
+
+            abort(502, 'The file could not be downloaded from Telegram.');
+        }
+
+        return response()->streamDownload(
+            static fn () => print $download->body(),
+            basename($filePath),
+            ['Content-Type' => $download->header('Content-Type', 'application/octet-stream')]
+        );
+    }
+
+    private function getTelegramFilePath(string $fileId): string
+    {
+        $token = config('services.telegram.bot_token');
+
+        if (! is_string($token) || $token === '') {
+            Log::error('Telegram bot token is not configured.');
+
+            abort(503, 'Telegram downloads are not configured.');
+        }
+
+        try {
+            $response = Http::acceptJson()
+                ->timeout(10)
+                ->get("https://api.telegram.org/bot{$token}/getFile", [
+                    'file_id' => $fileId,
+                ]);
+        } catch (ConnectionException) {
+            Log::warning('Telegram getFile request failed.');
+
+            abort(502, 'Telegram could not resolve the requested file.');
+        }
+
+        $filePath = $response->json('result.file_path');
+
+        if (! $response->successful() || $response->json('ok') !== true || ! is_string($filePath) || $filePath === '') {
+            Log::warning('Telegram getFile returned an unsuccessful response.', [
+                'status' => $response->status(),
+            ]);
+
+            abort(502, 'Telegram could not resolve the requested file.');
+        }
+
+        return $filePath;
     }
 }

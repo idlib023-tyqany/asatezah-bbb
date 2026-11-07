@@ -15,18 +15,12 @@ use App\Http\Controllers\Api\CommentController;
 use App\Http\Controllers\Api\FavoriteController;
 // Admin Controllers
 use App\Http\Controllers\Api\FileController;
+use App\Http\Controllers\Api\FolderController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\RatingController;
 use App\Http\Controllers\Api\ReportController;
-use App\Http\Controllers\Api\SocialAuthController;
 use App\Http\Controllers\Api\SupportController;
-use App\Http\Controllers\Api\UploadController;
 use Illuminate\Support\Facades\Route;
-
-Route::post('/auth/google', [SocialAuthController::class, 'handleGoogleCallback'])
-    ->middleware('throttle:6,1');
-Route::post('/auth/facebook', [SocialAuthController::class, 'handleFacebookCallback'])
-    ->middleware('throttle:6,1');
 
 /*
 |--------------------------------------------------------------------------
@@ -37,15 +31,20 @@ Route::post('/auth/facebook', [SocialAuthController::class, 'handleFacebookCallb
 Route::middleware('throttle:6,1')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/verification/confirm', [AuthController::class, 'verify']);
 });
+Route::post('/verification/resend', [AuthController::class, 'resendVerification'])
+    ->middleware('throttle:3,1');
 
 Route::get('/info', [AppInfoController::class, 'show']);
 Route::get('/filters', [CatalogController::class, 'filters']);
+Route::get('/folders', [FolderController::class, 'index']);
 
 Route::prefix('files')->group(function () {
     Route::get('/', [FileController::class, 'index']);
     Route::get('/{file}', [FileController::class, 'show']);
 });
+Route::get('/folders/{folder}', [FolderController::class, 'show']);
 
 /*
 |--------------------------------------------------------------------------
@@ -54,17 +53,27 @@ Route::prefix('files')->group(function () {
 */
 Route::middleware('auth:sanctum')->group(function () {
     // Profile & Auth
-    Route::get('/user', fn () => request()->user());
+    Route::get('/user', [AuthController::class, 'me']);
     Route::put('/profile/update', [AuthController::class, 'updateProfile']);
+    Route::post('/profile/contact-change', [AuthController::class, 'requestContactChange'])
+        ->middleware('throttle:3,1');
+    Route::post('/profile/contact-change/verify', [AuthController::class, 'verifyContactChange'])
+        ->middleware('throttle:6,1');
+    Route::post('/profile/contact-change/resend', [AuthController::class, 'resendContactChange'])
+        ->middleware('throttle:3,1');
     Route::put('/password', [AuthController::class, 'updatePassword']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::post('/logout-all', [AuthController::class, 'logoutAllDevices']);
     Route::delete('/account', [AuthController::class, 'destroy']);
 
     // Upload & Downloads
-    Route::post('/upload', [UploadController::class, 'store'])->middleware('throttle:uploads');
+    Route::post('/upload', [FileController::class, 'store'])->middleware('throttle:uploads');
     Route::get('/files/{file}/download', [FileController::class, 'download'])
         ->name('api.files.download');
+    Route::get('/files/telegram/{id}/download-url', [FileController::class, 'getDownloadUrl'])
+        ->name('api.files.telegram.download-url');
+    Route::get('/files/telegram/{id}/download', [FileController::class, 'downloadTelegramFile'])
+        ->name('api.files.telegram.download');
 
     // Favorites
     Route::prefix('favorites')->group(function () {
@@ -113,6 +122,8 @@ Route::middleware('auth:sanctum')->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
+    Route::put('/folders/{folder}', [FolderController::class, 'update']);
+
     // Users Management
     Route::prefix('users')->group(function () {
         Route::get('/', [AdminUserController::class, 'index']);

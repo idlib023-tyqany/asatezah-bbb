@@ -90,6 +90,43 @@ php artisan tinker --execute='$disk = Illuminate\Support\Facades\Storage::disk(c
 selected database; run `php artisan migrate` only when you are ready to apply
 pending schema changes.
 
+## Email and phone verification
+
+Registration requires a unique email address and an international phone number.
+Registration and every login create separate, expiring six-digit codes for
+email and SMS; the API issues no Sanctum token until both codes are confirmed.
+Contact changes are staged and applied only after the new destination's code is
+confirmed. Codes are stored as hashes, expire after 10 minutes, and allow at
+most five verification attempts.
+
+Configure a production mail transport with `MAIL_MAILER`, `MAIL_HOST`,
+`MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, and `MAIL_FROM_ADDRESS`. Configure
+the SMS gateway using:
+
+```dotenv
+SMS_API_ENDPOINT=https://your-sms-gateway.example/messages
+SMS_API_TOKEN=your-server-side-token
+SMS_SENDER=Asatezah
+```
+
+The configured SMS endpoint must accept the configured token in its
+Authorization header and a JSON body with `to`, `message`, and `sender` fields,
+then return a successful HTTP status when the message is accepted. Keep
+credentials only in the deployment environment.
+The development mailer defaults to Laravel's `log` driver; no SMS is sent until
+the gateway settings are present.
+
+Before deploying, inspect and apply the pending migrations against the intended
+database:
+
+```powershell
+php artisan migrate:status
+php artisan migrate --pretend
+php artisan migrate --force
+```
+
+Do not use `migrate:fresh` on a database with user data.
+
 ## Learning Laravel
 
 Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.

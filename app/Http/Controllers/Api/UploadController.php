@@ -73,6 +73,7 @@ class UploadController extends Controller
                     'description' => $validated['description'] ?? null,
                     'filename' => basename($uploadedFile->getClientOriginalName()),
                     'path' => $path,
+                    'file_type' => $mimeType,
                     'mime_type' => $mimeType,
                     'file_size' => $uploadedFile->getSize(),
                     'content_hash' => $contentHash,

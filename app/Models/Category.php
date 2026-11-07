@@ -59,6 +59,14 @@ class Category extends Model
     }
 
     /**
+     * Get all folders associated with the category.
+     */
+    public function folders(): HasMany
+    {
+        return $this->hasMany(Folder::class);
+    }
+
+    /**
      * Get only the published files for this category.
      */
     public function publishedFiles(): HasMany

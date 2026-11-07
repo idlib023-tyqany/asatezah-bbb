@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\File;
+use App\Models\Folder;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -29,6 +31,8 @@ class UploadApiTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.title', 'Algebra notes')
             ->assertJsonPath('data.status', 'pending')
+            ->assertJsonPath('data.file_type', 'application/pdf')
+            ->assertJsonPath('data.file_size', 32768)
             ->assertJsonPath('data.cover_image_url', null);
 
         $file = File::query()->sole();
@@ -37,6 +41,8 @@ class UploadApiTest extends TestCase
             'id' => $file->id,
             'uploaded_by' => $user->id,
             'content_hash' => $file->content_hash,
+            'file_type' => 'application/pdf',
+            'file_size' => 32768,
         ]);
         $this->assertTrue(Storage::disk()->exists($file->path));
         $this->assertStringStartsWith('documents/', $file->path);
@@ -44,6 +50,75 @@ class UploadApiTest extends TestCase
             route('api.files.download', ['file' => $file->id]),
             $response->json('data.download_url')
         );
+    }
+
+    public function test_upload_can_be_associated_with_a_folder(): void
+    {
+        Storage::fake();
+        $user = User::factory()->create(['can_contribute' => true]);
+        $folder = Folder::create(['name' => 'Algebra']);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->post('/api/upload', [
+                'title' => 'Algebra notes',
+                'folder_id' => $folder->id,
+                'file' => UploadedFile::fake()->createWithContent(
+                    'algebra.pdf',
+                    'unique algebra file content',
+                )->mimeType('application/pdf'),
+            ]);
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('files', [
+            'title' => 'Algebra notes',
+            'folder_id' => $folder->id,
+        ]);
+    }
+
+    public function test_folder_endpoint_returns_its_published_files_as_json(): void
+    {
+        $user = User::factory()->create();
+        $folder = Folder::create(['name' => 'Algebra']);
+        $childFolder = Folder::create([
+            'name' => 'Linear Algebra',
+            'parent_id' => $folder->id,
+        ]);
+
+        $publishedFile = File::create([
+            'uploaded_by' => $user->id,
+            'folder_id' => $folder->id,
+            'title' => 'Published notes',
+            'filename' => 'published.pdf',
+            'path' => 'documents/published.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size' => 10,
+            'content_hash' => hash('sha256', 'published file'),
+            'status' => File::STATUS_PUBLISHED,
+        ]);
+        File::create([
+            'uploaded_by' => $user->id,
+            'folder_id' => $folder->id,
+            'title' => 'Pending notes',
+            'filename' => 'pending.pdf',
+            'path' => 'documents/pending.pdf',
+            'mime_type' => 'application/pdf',
+            'file_size' => 10,
+            'content_hash' => hash('sha256', 'pending file'),
+            'status' => File::STATUS_PENDING,
+        ]);
+
+        $this->getJson("/api/folders/{$folder->id}")
+            ->assertOk()
+            ->assertJsonPath('data.name', 'Algebra')
+            ->assertJsonPath('data.children.0.id', $childFolder->id)
+            ->assertJsonPath('data.children.0.name', 'Linear Algebra')
+            ->assertJsonCount(1, 'data.files')
+            ->assertJsonPath('data.files.0.id', $publishedFile->id);
+
+        $this->getJson('/api/folders')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $folder->id)
+            ->assertJsonPath('data.0.files_count', 1);
     }
 
     public function test_uploads_are_stored_in_a_folder_based_on_their_mime_type(): void
@@ -120,6 +195,56 @@ class UploadApiTest extends TestCase
             'id' => $file->id,
             'downloads_count' => 1,
         ]);
+    }
+
+    public function test_telegram_download_url_uses_a_server_side_proxy(): void
+    {
+        config(['services.telegram.bot_token' => 'test-token']);
+        Http::fake([
+            'https://api.telegram.org/bottest-token/getFile*' => Http::response([
+                'ok' => true,
+                'result' => ['file_path' => 'documents/lesson.pdf'],
+            ]),
+        ]);
+
+        $response = $this->actingAs(User::factory()->create(), 'sanctum')
+            ->getJson('/api/files/telegram/sample-file-id/download-url');
+
+        $response
+            ->assertOk()
+            ->assertJsonPath(
+                'download_url',
+                route('api.files.telegram.download', ['id' => 'sample-file-id'])
+            )
+            ->assertDontSee('test-token');
+
+        Http::assertSent(fn ($request) => str_starts_with(
+            $request->url(),
+            'https://api.telegram.org/bottest-token/getFile?'
+        )
+            && $request['file_id'] === 'sample-file-id');
+    }
+
+    public function test_telegram_file_download_is_proxied_by_the_application(): void
+    {
+        config(['services.telegram.bot_token' => 'test-token']);
+        Http::fake([
+            'https://api.telegram.org/bottest-token/getFile*' => Http::response([
+                'ok' => true,
+                'result' => ['file_path' => 'documents/lesson.pdf'],
+            ]),
+            'https://api.telegram.org/file/bottest-token/documents/lesson.pdf' => Http::response(
+                'lesson contents',
+                200,
+                ['Content-Type' => 'application/pdf']
+            ),
+        ]);
+
+        $this->actingAs(User::factory()->create(), 'sanctum')
+            ->get(route('api.files.telegram.download', ['id' => 'sample-file-id']))
+            ->assertOk()
+            ->assertDownload('lesson.pdf')
+            ->assertStreamedContent('lesson contents');
     }
 
     public function test_upload_rejects_unsupported_file_types(): void

@@ -30,11 +30,13 @@ class File extends Model
         'uploaded_by',
         'category_id',
         'material_id',
+        'folder_id',
         'title',
         'description',
         'filename',
         'path',
         'thumbnail',
+        'file_type',
         'mime_type',
         'file_size',
         'content_hash',
@@ -56,6 +58,7 @@ class File extends Model
         'uploaded_by' => 'integer',
         'category_id' => 'integer',
         'material_id' => 'integer',
+        'folder_id' => 'integer',
         'file_size' => 'integer',
         'views_count' => 'integer',
         'downloads_count' => 'integer',
@@ -96,6 +99,14 @@ class File extends Model
     public function material(): BelongsTo
     {
         return $this->belongsTo(Material::class);
+    }
+
+    /**
+     * Get the folder that contains the file.
+     */
+    public function folder(): BelongsTo
+    {
+        return $this->belongsTo(Folder::class);
     }
 
     /**
