@@ -104,7 +104,7 @@ class UserController extends Controller
 
         try {
             DB::transaction(function () use ($user, $validated) {
-                $user->update(['can_contribute' => $validated['can_contribute']]);
+                $user->forceFill(['can_contribute' => $validated['can_contribute']])->save();
             });
 
             return response()->json([
@@ -155,3 +155,4 @@ class UserController extends Controller
         }
     }
 }
+

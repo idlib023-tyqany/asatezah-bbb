@@ -33,8 +33,6 @@ class User extends Authenticatable
         'email',
         'password',
         'avatar_path',
-        'role',
-        'can_contribute',
         'specialization',
         'display_name',
         'phone_number',
@@ -187,3 +185,4 @@ class User extends Authenticatable
         return (bool) $this->can_contribute || $this->isAdmin();
     }
 }
+

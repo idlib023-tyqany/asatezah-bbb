@@ -41,7 +41,7 @@ class AuthController extends Controller
             'device_name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $user = DB::transaction(fn (): User => User::create([
+        $user = DB::transaction(fn (): User => User::forceCreate([
             'name' => $validated['name'] ?? strtok($validated['email'], '@'),
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
@@ -569,3 +569,4 @@ class AuthController extends Controller
         return preg_replace('/[\s().-]/', '', trim($phoneNumber)) ?? '';
     }
 }
+

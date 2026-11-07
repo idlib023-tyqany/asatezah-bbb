@@ -274,27 +274,29 @@ class FileController extends Controller
         $filePath = $this->getTelegramFilePath($id);
         $token = config('services.telegram.bot_token');
 
-        try {
-            $download = Http::timeout(60)
-                ->get("https://api.telegram.org/file/bot{$token}/{$filePath}");
-        } catch (ConnectionException) {
-            Log::warning('Telegram file download request failed.');
-
-            abort(502, 'The file could not be downloaded from Telegram.');
-        }
-
-        if (! $download->successful()) {
-            Log::warning('Telegram file download returned an unsuccessful response.', [
-                'status' => $download->status(),
-            ]);
-
-            abort(502, 'The file could not be downloaded from Telegram.');
-        }
+        $fileUrl = "https://api.telegram.org/file/bot{$token}/{$filePath}";
 
         return response()->streamDownload(
-            static fn () => print $download->body(),
+            static function () use ($fileUrl): void {
+                $stream = @fopen($fileUrl, "rb");
+                if ($stream === false) {
+                    throw new RuntimeException("The file could not be downloaded from Telegram.");
+                }
+
+                try {
+                    while (! feof($stream)) {
+                        echo fread($stream, 1024 * 1024);
+                        if (ob_get_level() > 0) {
+                            ob_flush();
+                        }
+                        flush();
+                    }
+                } finally {
+                    fclose($stream);
+                }
+            },
             basename($filePath),
-            ['Content-Type' => $download->header('Content-Type', 'application/octet-stream')]
+            ["Content-Type" => "application/octet-stream"]
         );
     }
 
@@ -333,3 +335,4 @@ class FileController extends Controller
         return $filePath;
     }
 }
+
