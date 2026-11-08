@@ -66,6 +66,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout-all', [AuthController::class, 'logoutAllDevices']);
     Route::delete('/account', [AuthController::class, 'destroy']);
 
+    // AI Assistant Proxy
+    Route::post('/ai/assistant', function (\Illuminate\Http\Request $request) {
+        $validated = $request->validate(['prompt' => 'required|string|max:1000']);
+        $apiKey = config('services.gemini.api_key', env('GEMINI_API_KEY'));
+        if (!$apiKey) { return response()->json(['answer' => 'عذراً، خدمة المساعد الذكي قيد الصيانة حالياً.'], 503); }
+        $res = \Illuminate\Support\Facades\Http::post('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . $apiKey, ['contents' => [['parts' => [['text' => $validated['prompt']]]]]]);
+        $answer = $res->json('candidates.0.content.parts.0.text') ?? 'تعذّر توليد الإجابة، يرجى المحاولة لاحقاً.';
+        return response()->json(['answer' => $answer]);
+    })->middleware('throttle:15,1');
+
     // Upload & Downloads
     Route::post('/upload', [FileController::class, 'store'])->middleware('throttle:uploads');
     Route::get('/files/{file}/download', [FileController::class, 'download'])
