@@ -85,6 +85,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Ratings
     Route::post('/ratings/{file}', [RatingController::class, 'store']);
+    Route::get('/ratings/{file}', [RatingController::class, 'show']);
     Route::delete('/ratings/{file}', [RatingController::class, 'destroy']);
 
     // Comments

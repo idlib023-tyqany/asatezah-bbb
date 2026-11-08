@@ -34,3 +34,6 @@ services:
       - key: SESSION_DRIVER
         value: file
 
+
+      - key: QUEUE_CONNECTION
+        value: sync
