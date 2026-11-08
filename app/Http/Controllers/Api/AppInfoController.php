@@ -17,28 +17,27 @@ class AppInfoController extends Controller
      */
     public function show(): JsonResponse
     {
-        // استخدام التخزين المؤقت Cache لمنع الضغط على قاعدة البيانات
         $appInfo = Cache::remember(self::CACHE_KEY, 86400, function () {
             $keys = [
                 'app_name',
                 'logo_path',
                 'app_version',
-                'min_supported_version', // أدنى نسخة مدعومة لتفعيل Force Update
+                'min_supported_version',
                 'link_telegram',
                 'link_youtube',
                 'link_facebook',
                 'link_instagram',
+                'link_website',
+                'link_whatsapp',
+                'link_privacy_policy',
                 'maintenance_mode',
             ];
 
-            // جلب كافة المفاتيح المطلوبة باستعلام SQL واحد فقط
             $settings = Setting::whereIn('key', $keys)
                 ->pluck('value', 'key')
                 ->toArray();
 
             $logoPath = $settings['logo_path'] ?? null;
-
-            // استخدام asset() لضمان توليد URL كامل ومستقر لتطبيق Flutter
             $logoUrl = FileStorage::url($logoPath);
 
             return [
@@ -53,6 +52,9 @@ class AppInfoController extends Controller
                     'youtube' => $settings['link_youtube'] ?? null,
                     'facebook' => $settings['link_facebook'] ?? null,
                     'instagram' => $settings['link_instagram'] ?? null,
+                    'whatsapp' => $settings['link_whatsapp'] ?? null,
+                    'website' => $settings['link_website'] ?? null,
+                    'privacy_policy' => $settings['link_privacy_policy'] ?? null,
                 ],
             ];
         });
