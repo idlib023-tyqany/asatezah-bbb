@@ -77,6 +77,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Favorites
     Route::prefix('favorites')->group(function () {
+        Route::post('/{file}/toggle', [FavoriteController::class, 'toggle']);
         Route::get('/', [FavoriteController::class, 'index']);
         Route::post('/{file}', [FavoriteController::class, 'store']);
         Route::delete('/{file}', [FavoriteController::class, 'destroy']);
@@ -126,6 +127,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 
     // Users Management
     Route::prefix('users')->group(function () {
+        Route::put('/{user}', [AdminUserController::class, 'update']);
         Route::get('/', [AdminUserController::class, 'index']);
         Route::post('/{user}/contribution', [AdminUserController::class, 'setContribution']);
         Route::delete('/{user}', [AdminUserController::class, 'destroy']);
