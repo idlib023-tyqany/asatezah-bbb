@@ -77,7 +77,7 @@ class UserController extends Controller
 
         try {
             DB::transaction(function () use ($user, $validated) {
-                $user->update($validated);
+                $user->forceFill($validated)->save();
             });
 
             return response()->json([
