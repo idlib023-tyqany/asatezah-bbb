@@ -25,17 +25,21 @@ class CatalogApiTest extends TestCase
             'category_id' => $category->id,
         ]);
 
-        $this->getJson('/api/filters')
+        $this->actingAs(User::factory()->teacher()->create(), 'sanctum')
+            ->getJson('/api/filters')
             ->assertOk()
             ->assertJsonPath('categories.0.icon', 'calculator')
             ->assertJsonPath('materials.0.category_id', $category->id)
             ->assertJsonPath('materials.0.name', $material->name);
     }
 
-    public function test_admin_catalog_changes_invalidate_public_filter_cache(): void
+    public function test_admin_catalog_changes_invalidate_authenticated_filter_cache(): void
     {
-        $this->getJson('/api/filters')->assertOk();
         $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/filters')
+            ->assertOk();
 
         $this->actingAs($admin, 'sanctum')
             ->postJson('/api/admin/categories', ['name' => 'Science'])

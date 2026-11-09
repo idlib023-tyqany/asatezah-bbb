@@ -17,7 +17,9 @@ class EnsureUserCanContribute
     {
         $user = $request->user();
 
-        if (! $user || ! $user->canContribute()) {
+        if (! $user
+            || (! $user->isTeacher() && ! $user->isAdmin())
+            || ! $user->canContribute()) {
             return response()->json([
                 'success' => false,
                 'message' => 'عذراً، ليس لديك الصلاحية لرفع المواد أو المساهمة في المحتوى.',

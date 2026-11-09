@@ -46,7 +46,7 @@ class AuthController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'specialization' => $validated['specialization'] ?? null,
-            'role' => User::ROLE_STUDENT,
+            'role' => User::ROLE_TEACHER,
             'can_contribute' => true,
             'display_name' => $validated['display_name'] ?? null,
             'phone_number' => $validated['phone_number'],
@@ -95,6 +95,12 @@ class AuthController extends Controller
             ], 401);
         }
 
+        if (! $user->isTeacher() && ! $user->isAdmin()) {
+            return response()->json([
+                'message' => 'هذا النظام مخصص لحسابات الأساتذة فقط.',
+            ], 403);
+        }
+
         if ($user->deactivated_at !== null
             || (! $user->is_active && ($user->email_verified_at || $user->phone_verified_at))) {
             return response()->json([
@@ -136,6 +142,11 @@ class AuthController extends Controller
 
         if (! in_array($challenge->purpose, ['register', 'login'], true)) {
             return response()->json(['message' => 'رمز التحقق غير صالح لهذا الطلب.'], 422);
+        }
+        if ($challenge->purpose === 'login'
+            && ! $challenge->user->isTeacher()
+            && ! $challenge->user->isAdmin()) {
+            return response()->json(['message' => 'هذا النظام مخصص لحسابات الأساتذة فقط.'], 403);
         }
 
         $result = DB::transaction(function () use ($validated): array {
@@ -569,4 +580,3 @@ class AuthController extends Controller
         return preg_replace('/[\s().-]/', '', trim($phoneNumber)) ?? '';
     }
 }
-

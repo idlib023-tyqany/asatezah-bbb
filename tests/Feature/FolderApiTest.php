@@ -39,6 +39,7 @@ class FolderApiTest extends TestCase
 
     public function test_show_returns_breadcrumbs_from_root_to_current_folder(): void
     {
+        $teacher = User::factory()->teacher()->create();
         $root = Folder::create(['name' => 'Root']);
         $parent = Folder::create([
             'name' => 'Parent',
@@ -67,7 +68,8 @@ class FolderApiTest extends TestCase
             ],
         ], $folder->getBreadcrumbs());
 
-        $this->getJson("/api/folders/{$folder->id}")
+        $this->actingAs($teacher, 'sanctum')
+            ->getJson("/api/folders/{$folder->id}")
             ->assertOk()
             ->assertJsonPath('data.breadcrumbs', [
                 [

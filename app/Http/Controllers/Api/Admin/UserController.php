@@ -21,6 +21,8 @@ class UserController extends Controller
         $query = User::query()
             ->withCount('files'); // حماية من استعلامات N+1
 
+        $query->whereIn('role', [User::ROLE_TEACHER, User::ROLE_ADMIN]);
+
         // بحث بالاسم أو البريد الإلكتروني مع حماية النطاق
         if ($request->filled('q')) {
             $q = $request->string('q')->toString();
@@ -30,9 +32,12 @@ class UserController extends Controller
             });
         }
 
-        // فلترة بالـ Role (admin / student / teacher)
+        // Filter to the two supported account roles.
         if ($request->filled('role')) {
-            $query->where('role', $request->string('role')->toString());
+            $validated = $request->validate([
+                'role' => ['string', Rule::in([User::ROLE_TEACHER, User::ROLE_ADMIN])],
+            ]);
+            $query->where('role', $validated['role']);
         }
 
         // فلترة بإمكانية المساهمة
@@ -65,7 +70,7 @@ class UserController extends Controller
     public function update(Request $request, User $user): JsonResponse
     {
         $validated = $request->validate([
-            'role' => ['sometimes', 'string', Rule::in(['student', 'teacher', 'admin'])],
+            'role' => ['sometimes', 'string', Rule::in([User::ROLE_TEACHER, User::ROLE_ADMIN])],
             'can_contribute' => ['sometimes', 'boolean'],
             'specialization' => ['nullable', 'string', 'max:255'],
         ]);
@@ -155,4 +160,3 @@ class UserController extends Controller
         }
     }
 }
-

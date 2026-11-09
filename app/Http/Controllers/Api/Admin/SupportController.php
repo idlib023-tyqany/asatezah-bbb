@@ -39,7 +39,7 @@ class SupportController extends Controller
             $query->where('status', $status);
         }
 
-        // بحث باسم الطالب أو الإيميل مع حماية النطاق
+        // Search by the user's name or email within the scoped query.
         if ($request->filled('q')) {
             $q = $request->string('q')->toString();
             $query->whereHas('user', function ($userQuery) use ($q) {

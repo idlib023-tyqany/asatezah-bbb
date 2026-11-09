@@ -37,21 +37,22 @@ Route::post('/verification/resend', [AuthController::class, 'resendVerification'
     ->middleware('throttle:3,1');
 
 Route::get('/info', [AppInfoController::class, 'show']);
-Route::get('/filters', [CatalogController::class, 'filters']);
-Route::get('/folders', [FolderController::class, 'index']);
-
-Route::prefix('files')->group(function () {
-    Route::get('/', [FileController::class, 'index']);
-    Route::get('/{file}', [FileController::class, 'show']);
-});
-Route::get('/folders/{folder}', [FolderController::class, 'show']);
 
 /*
 |--------------------------------------------------------------------------
 | Authenticated User Routes
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(['auth:sanctum', 'teacher'])->group(function () {
+    Route::get('/filters', [CatalogController::class, 'filters']);
+    Route::get('/folders', [FolderController::class, 'index']);
+    Route::get('/folders/{folder}', [FolderController::class, 'show']);
+
+    Route::prefix('files')->group(function () {
+        Route::get('/', [FileController::class, 'index']);
+        Route::get('/{file}', [FileController::class, 'show']);
+    });
+
     // Profile & Auth
     Route::get('/user', [AuthController::class, 'me']);
     Route::put('/profile/update', [AuthController::class, 'updateProfile']);
@@ -71,7 +72,8 @@ Route::middleware('auth:sanctum')->group(function () {
         $validated = $request->validate(['prompt' => 'required|string|max:1000']);
         $apiKey = config('services.gemini.api_key', env('GEMINI_API_KEY'));
         if (!$apiKey) { return response()->json(['answer' => 'عذراً، خدمة المساعد الذكي قيد الصيانة حالياً.'], 503); }
-        $res = \Illuminate\Support\Facades\Http::post('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . $apiKey, ['contents' => [['parts' => [['text' => $validated['prompt']]]]]]);
+        $prompt = "أنت مساعد تربوي مخصص للأساتذة والمعلمين. ساعد في تحضير الدروس وتوليد أسئلة متنوعة مع إجاباتها وشرح الأفكار العلمية بوضوح. أجب باللغة العربية ما لم يُطلب غير ذلك.\n\nطلب الأستاذ: ".$validated['prompt'];
+        $res = \Illuminate\Support\Facades\Http::post('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' . $apiKey, ['contents' => [['parts' => [['text' => $prompt]]]]]);
         $answer = $res->json('candidates.0.content.parts.0.text') ?? 'تعذّر توليد الإجابة، يرجى المحاولة لاحقاً.';
         return response()->json(['answer' => $answer]);
     })->middleware('throttle:15,1');

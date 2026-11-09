@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureUserCanContribute;
 use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Http\Middleware\EnsureUserIsTeacher;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
             'can_contribute' => EnsureUserCanContribute::class,
+            'teacher' => EnsureUserIsTeacher::class,
         ]);
 
         $middleware->throttleApi();

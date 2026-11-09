@@ -276,27 +276,43 @@ class FileController extends Controller
 
         $fileUrl = "https://api.telegram.org/file/bot{$token}/{$filePath}";
 
-        return response()->streamDownload(
-            static function () use ($fileUrl): void {
-                $stream = @fopen($fileUrl, "rb");
-                if ($stream === false) {
-                    throw new RuntimeException("The file could not be downloaded from Telegram.");
-                }
+        try {
+            $response = Http::withOptions(['stream' => true])
+                ->timeout(30)
+                ->get($fileUrl);
+        } catch (ConnectionException) {
+            Log::warning('Telegram file download request failed.');
 
-                try {
-                    while (! feof($stream)) {
-                        echo fread($stream, 1024 * 1024);
-                        if (ob_get_level() > 0) {
-                            ob_flush();
-                        }
-                        flush();
+            abort(502, 'Telegram could not download the requested file.');
+        }
+
+        if (! $response->successful()) {
+            Log::warning('Telegram file download returned an unsuccessful response.', [
+                'status' => $response->status(),
+            ]);
+
+            abort(502, 'Telegram could not download the requested file.');
+        }
+
+        $stream = $response->toPsrResponse()->getBody();
+
+        return response()->streamDownload(
+            static function () use ($stream): void {
+                while (! $stream->eof()) {
+                    $chunk = $stream->read(1024 * 1024);
+                    if ($chunk === '') {
+                        break;
                     }
-                } finally {
-                    fclose($stream);
+
+                    echo $chunk;
+                    if (ob_get_level() > 0) {
+                        ob_flush();
+                    }
+                    flush();
                 }
             },
             basename($filePath),
-            ["Content-Type" => "application/octet-stream"]
+            ['Content-Type' => $response->header('Content-Type', 'application/octet-stream')]
         );
     }
 
@@ -335,4 +351,3 @@ class FileController extends Controller
         return $filePath;
     }
 }
-

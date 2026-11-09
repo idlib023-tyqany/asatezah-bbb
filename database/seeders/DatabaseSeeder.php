@@ -46,23 +46,7 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 3. حساب طالب تجريبي (Student)
-        $student = User::firstOrCreate(
-            ['email' => 'student@asatezah.com'],
-            [
-                'name' => 'محمد علي',
-                'display_name' => 'محمد علي',
-                'phone_number' => '+966500000002',
-                'password' => Hash::make('password'),
-                'role' => User::ROLE_STUDENT,
-                'can_contribute' => true,
-                'is_active' => true,
-                'email_verified_at' => now(),
-                'phone_verified_at' => now(),
-            ]
-        );
-
-        // 4. التصنيفات والصفوف
+        // 3. التصنيفات والصفوف التعليمية
         $categoriesData = [
             ['name' => 'الصف الأول الابتدائي', 'slug' => 'grade-1'],
             ['name' => 'الصف الثاني الابتدائي', 'slug' => 'grade-2'],
@@ -77,7 +61,7 @@ class DatabaseSeeder extends Seeder
             $categories[] = Category::firstOrCreate(['slug' => $cat['slug']], $cat);
         }
 
-        // 5. المواد الدراسية
+        // 4. المواد الدراسية
         $firstCat = $categories[0] ?? null;
         $materialsData = [
             ['name' => 'رياضيات', 'slug' => 'math', 'code' => 'MATH-101'],
@@ -95,7 +79,7 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        // 6. الإعدادات وروابط التواصل
+        // 5. الإعدادات وروابط التواصل
         $settings = [
             'app_name' => ['value' => 'أساتذة', 'type' => 'string'],
             'app_version' => ['value' => '1.0.0', 'type' => 'string'],

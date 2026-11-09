@@ -136,6 +136,7 @@ class AuthenticationApiTest extends TestCase
         $this->assertDatabaseHas('users', [
             'email' => 'new@example.com',
             'phone_number' => '+963912345678',
+            'role' => User::ROLE_TEACHER,
             'specialization' => 'Mathematics',
             'is_active' => false,
             'email_verified_at' => null,
@@ -236,6 +237,15 @@ class AuthenticationApiTest extends TestCase
     public function test_protected_api_requests_require_authentication(): void
     {
         $this->getJson('/api/user')->assertUnauthorized();
+    }
+
+    public function test_library_routes_require_an_authenticated_teacher_account(): void
+    {
+        $this->getJson('/api/files')->assertUnauthorized();
+
+        $this->actingAs(User::factory()->teacher()->create(), 'sanctum')
+            ->getJson('/api/files')
+            ->assertOk();
     }
 
     public function test_logout_revokes_the_current_token(): void

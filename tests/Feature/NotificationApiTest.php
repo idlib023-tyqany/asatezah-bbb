@@ -108,7 +108,7 @@ class NotificationApiTest extends TestCase
     public function test_admin_broadcast_persists_extra_data_and_excludes_admin_users(): void
     {
         $admin = User::factory()->admin()->create();
-        $recipient = User::factory()->student()->create();
+        $recipient = User::factory()->teacher()->create();
 
         $this->actingAs($admin, 'sanctum')
             ->postJson('/api/admin/notifications/all', [

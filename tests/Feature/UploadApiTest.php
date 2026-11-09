@@ -107,7 +107,8 @@ class UploadApiTest extends TestCase
             'status' => File::STATUS_PENDING,
         ]);
 
-        $this->getJson("/api/folders/{$folder->id}")
+        $this->actingAs($user, 'sanctum')
+            ->getJson("/api/folders/{$folder->id}")
             ->assertOk()
             ->assertJsonPath('data.name', 'Algebra')
             ->assertJsonPath('data.children.0.id', $childFolder->id)
@@ -245,6 +246,9 @@ class UploadApiTest extends TestCase
             ->assertOk()
             ->assertDownload('lesson.pdf')
             ->assertStreamedContent('lesson contents');
+
+        Http::assertSent(fn ($request) => $request->url()
+            === 'https://api.telegram.org/file/bottest-token/documents/lesson.pdf');
     }
 
     public function test_upload_rejects_unsupported_file_types(): void

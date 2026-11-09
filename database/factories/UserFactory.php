@@ -29,22 +29,12 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'phone' => fake()->unique()->phoneNumber(),
             'phone_number' => '+9665'.fake()->unique()->numerify('########'),
-            'role' => 'student', // القيمة الافتراضية
+            'role' => User::ROLE_TEACHER,
             'email_verified_at' => now(),
             'phone_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
-    }
-
-    /**
-     * Indicate that the user is a Student.
-     */
-    public function student(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'role' => 'student',
-        ]);
     }
 
     /**

@@ -19,8 +19,6 @@ class User extends Authenticatable
     // أدوار المستخدمين
     public const ROLE_ADMIN = 'admin';
 
-    public const ROLE_STUDENT = 'student';
-
     public const ROLE_TEACHER = 'teacher';
 
     /**
@@ -185,4 +183,3 @@ class User extends Authenticatable
         return (bool) $this->can_contribute || $this->isAdmin();
     }
 }
-
