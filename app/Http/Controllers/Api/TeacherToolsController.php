@@ -3,27 +3,28 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\TeacherToolsService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class TeacherToolsController extends Controller
 {
-    // --- جدول الحصص ---
-    public function getTimetable(Request $request)
+    public function __construct(private readonly TeacherToolsService $teacherTools)
     {
-        $teacherId = $request->user()?->id ?? 1;
-        $items = DB::table('teacher_timetables')
-            ->join('grades', 'teacher_timetables.grade_id', '=', 'grades.id')
-            ->join('subjects', 'teacher_timetables.subject_id', '=', 'subjects.id')
-            ->where('teacher_timetables.teacher_id', $teacherId)
-            ->select('teacher_timetables.*', 'grades.name as grade_name', 'subjects.name as subject_name')
-            ->orderBy('start_time')
-            ->get();
-
-        return response()->json(['status' => 'success', 'data' => $items]);
     }
 
-    public function addTimetableSlot(Request $request)
+    // --- جدول الحصص ---
+    public function getTimetable(Request $request): JsonResponse
+    {
+        $teacherId = $request->user()->id;
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $this->teacherTools->timetableFor($teacherId),
+        ]);
+    }
+
+    public function addTimetableSlot(Request $request): JsonResponse
     {
         $data = $request->validate([
             'day_of_week'      => 'required|string',
@@ -36,28 +37,30 @@ class TeacherToolsController extends Controller
             'reminder_minutes' => 'nullable|integer',
         ]);
 
-        $data['teacher_id'] = $request->user()?->id ?? 1;
-        $data['created_at'] = now();
+        $slot = $this->teacherTools->addTimetableSlot(
+            $request->user()->id,
+            $data,
+        );
 
-        $id = DB::table('teacher_timetables')->insertGetId($data);
-        return response()->json(['status' => 'success', 'id' => $id, 'message' => 'تمت إضافة الحصة للجدول']);
+        return response()->json([
+            'status' => 'success',
+            'id' => $slot->getKey(),
+            'message' => 'تمت إضافة الحصة للجدول',
+        ]);
     }
 
     // --- أين توقفت؟ (متتبع الشعب) ---
-    public function getProgress(Request $request)
+    public function getProgress(Request $request): JsonResponse
     {
-        $teacherId = $request->user()?->id ?? 1;
-        $progress = DB::table('class_progress')
-            ->join('grades', 'class_progress.grade_id', '=', 'grades.id')
-            ->where('class_progress.teacher_id', $teacherId)
-            ->select('class_progress.*', 'grades.name as grade_name')
-            ->latest('class_progress.updated_at')
-            ->get();
+        $teacherId = $request->user()->id;
 
-        return response()->json(['status' => 'success', 'data' => $progress]);
+        return response()->json([
+            'status' => 'success',
+            'data' => $this->teacherTools->progressFor($teacherId),
+        ]);
     }
 
-    public function updateProgress(Request $request)
+    public function updateProgress(Request $request): JsonResponse
     {
         $data = $request->validate([
             'grade_id'    => 'required|integer',
@@ -66,30 +69,26 @@ class TeacherToolsController extends Controller
             'page_number' => 'nullable|string',
         ]);
 
-        $teacherId = $request->user()?->id ?? 1;
-        DB::table('class_progress')->updateOrInsert(
-            ['teacher_id' => $teacherId, 'grade_id' => $data['grade_id'], 'section' => $data['section']],
-            ['last_topic' => $data['last_topic'], 'page_number' => $data['page_number'], 'updated_at' => now()]
+        $this->teacherTools->updateProgress(
+            $request->user()->id,
+            $data,
         );
 
         return response()->json(['status' => 'success', 'message' => 'تم حفظ آخر نقطة توقف']);
     }
 
     // --- المفكرة السريعة ---
-    public function getNotes(Request $request)
+    public function getNotes(Request $request): JsonResponse
     {
-        $teacherId = $request->user()?->id ?? 1;
-        $notes = DB::table('class_notes')
-            ->join('grades', 'class_notes.grade_id', '=', 'grades.id')
-            ->where('class_notes.teacher_id', $teacherId)
-            ->select('class_notes.*', 'grades.name as grade_name')
-            ->latest()
-            ->get();
+        $teacherId = $request->user()->id;
 
-        return response()->json(['status' => 'success', 'data' => $notes]);
+        return response()->json([
+            'status' => 'success',
+            'data' => $this->teacherTools->notesFor($teacherId),
+        ]);
     }
 
-    public function addNote(Request $request)
+    public function addNote(Request $request): JsonResponse
     {
         $data = $request->validate([
             'grade_id'     => 'required|integer',
@@ -97,10 +96,11 @@ class TeacherToolsController extends Controller
             'note_content' => 'required|string',
         ]);
 
-        $data['teacher_id'] = $request->user()?->id ?? 1;
-        $data['created_at'] = now();
+        $this->teacherTools->addNote(
+            $request->user()->id,
+            $data,
+        );
 
-        DB::table('class_notes')->insert($data);
         return response()->json(['status' => 'success', 'message' => 'تم حفظ الملاحظة']);
     }
 }

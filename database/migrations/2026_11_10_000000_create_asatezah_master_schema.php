@@ -59,14 +59,19 @@ return new class extends Migration
         Schema::dropIfExists('users');
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('display_title');
-            $table->string('first_name');
-            $table->string('father_name');
-            $table->string('last_name');
+            $table->string('name');
             $table->string('email')->unique();
-            $table->string('phone')->unique();
-            $table->enum('teacher_type', ['subject_teacher', 'class_teacher'])->default('subject_teacher');
-            $table->enum('status', ['active', 'banned', 'pending'])->default('pending');
+            $table->string('phone')->nullable()->unique();
+            $table->string('phone_number')->nullable()->unique();
+            $table->string('avatar')->nullable();
+            $table->string('specialization')->nullable();
+            $table->string('display_name')->nullable();
+            $table->enum('trainer_type', ['subject_teacher', 'class_teacher'])->nullable();
+            $table->enum('role', ['teacher', 'admin'])->default('teacher')->index();
+            $table->boolean('can_contribute')->default(false);
+            $table->boolean('is_active')->default(true);
+            $table->timestamp('deactivated_at')->nullable();
+            $table->string('fcm_token')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->timestamp('phone_verified_at')->nullable();
             $table->string('password');
@@ -183,14 +188,19 @@ return new class extends Migration
         });
 
         // 14. أكواد التحقق (OTP)
-        Schema::dropIfExists('verification_codes');
-        Schema::create('verification_codes', function (Blueprint $table) {
-            $table->id();
+        Schema::dropIfExists('verification_challenges');
+        Schema::create('verification_challenges', function (Blueprint $table) {
+            $table->uuid('id')->primary();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->enum('channel', ['email', 'phone']);
-            $table->string('code', 8);
+            $table->string('purpose');
+            $table->string('email')->nullable();
+            $table->string('phone_number')->nullable();
+            $table->string('email_code_hash')->nullable();
+            $table->string('phone_code_hash')->nullable();
+            $table->json('channels');
+            $table->unsignedTinyInteger('attempts')->default(0);
+            $table->unsignedTinyInteger('resends')->default(0);
             $table->timestamp('expires_at');
-            $table->boolean('is_used')->default(false);
             $table->timestamps();
         });
 
@@ -224,7 +234,7 @@ return new class extends Migration
         Schema::disableForeignKeyConstraints();
         Schema::dropIfExists('ai_messages');
         Schema::dropIfExists('ai_chats');
-        Schema::dropIfExists('verification_codes');
+        Schema::dropIfExists('verification_challenges');
         Schema::dropIfExists('support_tickets');
         Schema::dropIfExists('file_reports');
         Schema::dropIfExists('file_comments');

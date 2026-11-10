@@ -9,6 +9,15 @@ use App\Services\FileIdService;
 
 class FileController extends Controller
 {
+    public function index()
+    {
+        $files = DB::table('files')
+            ->orderByDesc('created_at')
+            ->paginate(20);
+
+        return response()->json($files);
+    }
+
     // تفاصيل ملف محدد (مع عدادات المشاهدة)
     public function show($id)
     {
@@ -23,7 +32,7 @@ class FileController extends Controller
         $comments = DB::table('file_comments')
             ->join('users', 'file_comments.user_id', '=', 'users.id')
             ->where('file_id', $id)
-            ->select('file_comments.*', 'users.display_title')
+            ->select('file_comments.*', 'users.display_name')
             ->latest()
             ->get();
 
@@ -37,7 +46,7 @@ class FileController extends Controller
     // تبديل حالة المفضلة (قلب الحب)
     public function toggleFavorite(Request $request, $id)
     {
-        $userId = $request->user()?->id ?? 1; // الافتراضي مؤقتاً للتجربة
+        $userId = $request->user()->id;
         $exists = DB::table('favorites')->where(['user_id' => $userId, 'file_id' => $id])->first();
 
         if ($exists) {
@@ -65,7 +74,7 @@ class FileController extends Controller
 
         DB::table('file_reports')->insert([
             'file_id'      => $id,
-            'reporter_id'  => $request->user()?->id ?? 1,
+            'reporter_id'  => $request->user()->id,
             'reason'       => $validated['reason'],
             'message'      => $validated['message'],
             'status'       => 'pending',
