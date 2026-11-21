@@ -29,6 +29,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'teacher_active' => EnsureTeacherIsActive::class,
         ]);
 
+        $middleware->trustProxies(at: '*');
+
         $middleware->throttleApi();
 
         // ضمان تطبيق CORS والحماية على كافة مسارات الـ API
