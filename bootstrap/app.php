@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureTeacherIsActive;
 use App\Http\Middleware\EnsureUserCanContribute;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsTeacher;
@@ -25,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => EnsureUserIsAdmin::class,
             'can_contribute' => EnsureUserCanContribute::class,
             'teacher' => EnsureUserIsTeacher::class,
+            'teacher_active' => EnsureTeacherIsActive::class,
         ]);
 
         $middleware->throttleApi();

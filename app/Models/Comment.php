@@ -44,7 +44,6 @@ class Comment extends Model
     protected $casts = [
         'is_approved' => 'boolean',
         'user_id' => 'integer',
-        'file_id' => 'integer',
         'parent_id' => 'integer',
     ];
 

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class TeacherToolsApiTest extends TestCase
@@ -68,6 +69,30 @@ class TeacherToolsApiTest extends TestCase
         $this->getJson('/api/notes')
             ->assertOk()
             ->assertJsonPath('data.0.note_content', 'مراجعة التمرين قبل الحصة القادمة.');
+    }
+
+    public function test_gemini_key_is_sent_only_in_the_header_and_errors_are_generic(): void
+    {
+        config(['services.gemini.api_key' => 'test-gemini-secret']);
+        Http::fakeSequence()
+            ->push(['candidates' => [['content' => ['parts' => [['text' => 'خطة الدرس']]]]]])
+            ->push(['error' => ['message' => 'internal upstream detail']], 500);
+
+        $teacher = User::factory()->teacher()->create();
+        $payload = ['prompt' => 'اكتب خطة درس.', 'mode' => 'lesson_plan'];
+
+        $this->actingAs($teacher, 'sanctum')
+            ->postJson('/api/ai/assist', $payload)
+            ->assertOk()
+            ->assertJsonPath('result', 'خطة الدرس');
+
+        $this->postJson('/api/ai/assist', $payload)
+            ->assertStatus(502)
+            ->assertDontSee('internal upstream detail')
+            ->assertJsonPath('message', 'تعذر معالجة الطلب عبر المساعد الذكي حالياً.');
+
+        Http::assertSent(fn ($request): bool => $request->hasHeader('x-goog-api-key', 'test-gemini-secret')
+            && ! str_contains($request->url(), 'key='));
     }
 
     private function createGrade(): int

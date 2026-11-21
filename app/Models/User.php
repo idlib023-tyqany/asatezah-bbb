@@ -35,7 +35,6 @@ class User extends Authenticatable
         'display_name',
         'phone_number',
         'trainer_type',
-        'is_active',
         'fcm_token', // للربط مع إشعارات التطبيق المستقبلية
     ];
 
@@ -62,6 +61,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'can_contribute' => 'boolean',
             'is_active' => 'boolean',
+            'is_banned' => 'boolean',
+            'deactivated_at' => 'datetime',
         ];
     }
 

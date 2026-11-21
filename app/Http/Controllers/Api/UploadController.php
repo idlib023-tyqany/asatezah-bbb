@@ -9,6 +9,7 @@ use App\Support\FileStorage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Throwable;
 
@@ -27,19 +28,45 @@ class UploadController extends Controller
             'description' => ['nullable', 'string', 'max:5000'],
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
             'material_id' => ['nullable', 'integer', 'exists:materials,id'],
+            'folder_id' => ['nullable', 'integer', 'exists:folders,id'],
             'file' => [
                 'required',
                 'file',
                 'mimes:mp4,mov,avi,mkv,webm,pdf,doc,docx,xls,xlsx,jpg,jpeg,png,gif,webp',
+                'extensions:mp4,mov,avi,mkv,webm,pdf,doc,docx,xls,xlsx,jpg,jpeg,png,gif,webp',
                 'max:51200',
             ],
         ]);
 
         $uploadedFile = $request->file('file');
-        $mimeType = $uploadedFile->getMimeType() ?? '';
+        $mimeType = (new \finfo(FILEINFO_MIME_TYPE))->file($uploadedFile->getRealPath()) ?: '';
+        $extension = strtolower($uploadedFile->getClientOriginalExtension());
+        $mimeTypesByExtension = [
+            'mp4' => ['video/mp4'],
+            'mov' => ['video/quicktime'],
+            'avi' => ['video/x-msvideo'],
+            'mkv' => ['video/x-matroska'],
+            'webm' => ['video/webm'],
+            'pdf' => ['application/pdf'],
+            'doc' => ['application/msword'],
+            'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+            'xls' => ['application/vnd.ms-excel'],
+            'xlsx' => ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+            'jpg' => ['image/jpeg'],
+            'jpeg' => ['image/jpeg'],
+            'png' => ['image/png'],
+            'gif' => ['image/gif'],
+            'webp' => ['image/webp'],
+        ];
+        if (! in_array($mimeType, $mimeTypesByExtension[$extension] ?? [], true)) {
+            throw ValidationException::withMessages([
+                'file' => 'The uploaded file extension does not match its content type.',
+            ]);
+        }
+
         $directory = match (true) {
-            str_starts_with($mimeType, 'video/') => 'videos',
-            str_starts_with($mimeType, 'image/') => 'images',
+            in_array($mimeType, ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska', 'video/webm'], true) => 'videos',
+            in_array($mimeType, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true) => 'images',
             in_array($mimeType, [
                 'application/pdf',
                 'application/msword',
@@ -69,7 +96,9 @@ class UploadController extends Controller
                     'uploaded_by' => $user->id,
                     'category_id' => $validated['category_id'] ?? null,
                     'material_id' => $validated['material_id'] ?? null,
+                    'folder_id' => $validated['folder_id'] ?? null,
                     'title' => $validated['title'],
+                    'name' => $validated['title'],
                     'description' => $validated['description'] ?? null,
                     'filename' => basename($uploadedFile->getClientOriginalName()),
                     'path' => $path,

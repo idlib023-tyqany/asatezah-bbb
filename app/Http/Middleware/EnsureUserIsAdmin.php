@@ -4,23 +4,24 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
 
 class EnsureUserIsAdmin
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  Closure(Request): (Response)  $next
-     */
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next)
     {
         $user = $request->user();
+        $attributes = $user?->getAttributes() ?? [];
+        $isAdmin = $user
+            && $user->isAdmin()
+            && ($attributes['status'] ?? 'active') === 'active'
+            && ! (bool) ($attributes['is_banned'] ?? false)
+            && ($attributes['is_active'] ?? true)
+            && ($attributes['deactivated_at'] ?? null) === null;
 
-        if (! $user || ! $user->isAdmin()) {
+        if (! $isAdmin) {
             return response()->json([
-                'success' => false,
-                'message' => 'عذراً، هذه الصلاحية محصورة بمدراء النظام فقط.',
+                'status' => 'error',
+                'message' => 'غير مصرح لك بالوصول إلى لوحة الإدارة.',
             ], 403);
         }
 

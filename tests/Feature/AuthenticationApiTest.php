@@ -248,6 +248,27 @@ class AuthenticationApiTest extends TestCase
             ->assertOk();
     }
 
+    public function test_library_and_admin_routes_reject_inactive_or_banned_accounts(): void
+    {
+        $inactiveTeacher = User::factory()->teacher()->create();
+        $inactiveTeacher->forceFill(['status' => 'suspended'])->save();
+        $this->actingAs($inactiveTeacher, 'sanctum')
+            ->getJson('/api/files')
+            ->assertForbidden();
+
+        $bannedTeacher = User::factory()->teacher()->create();
+        $bannedTeacher->forceFill(['is_banned' => true])->save();
+        $this->actingAs($bannedTeacher, 'sanctum')
+            ->getJson('/api/files')
+            ->assertForbidden();
+
+        $bannedAdmin = User::factory()->admin()->create();
+        $bannedAdmin->forceFill(['is_banned' => true])->save();
+        $this->actingAs($bannedAdmin, 'sanctum')
+            ->getJson('/api/admin/settings')
+            ->assertForbidden();
+    }
+
     public function test_logout_revokes_the_current_token(): void
     {
         $user = User::factory()->create();

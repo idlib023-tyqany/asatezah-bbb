@@ -162,7 +162,7 @@ class FileController extends Controller
     /**
      * Restore a file from the trash bin.
      */
-    public function restore(int $id): JsonResponse
+    public function restore(string $id): JsonResponse
     {
         $file = File::onlyTrashed()->findOrFail($id);
 
@@ -178,7 +178,7 @@ class FileController extends Controller
     /**
      * Permanently delete a file and its storage file.
      */
-    public function forceDelete(int $id): JsonResponse
+    public function forceDelete(string $id): JsonResponse
     {
         $file = File::onlyTrashed()->findOrFail($id);
 
@@ -239,7 +239,7 @@ class FileController extends Controller
     {
         $validated = $request->validate([
             'ids' => ['required', 'array'],
-            'ids.*' => ['integer', 'exists:files,id'],
+            'ids.*' => ['string', 'size:20', 'exists:files,id'],
         ]);
 
         DB::transaction(function () use ($validated) {

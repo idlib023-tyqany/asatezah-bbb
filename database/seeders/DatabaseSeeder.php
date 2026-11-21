@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -125,9 +126,14 @@ class DatabaseSeeder extends Seeder
             if ($admin) {
                 DB::table('users')->where('id', $admin->id)->update($adminAttributes);
             } else {
+                $password = env('ADMIN_DEFAULT_PASSWORD');
+                if (! $password && app()->environment('production')) {
+                    throw new \RuntimeException('ADMIN_DEFAULT_PASSWORD must be set before seeding the production administrator.');
+                }
+
                 DB::table('users')->insert(array_merge($adminAttributes, [
                     'email' => $email,
-                    'password' => Hash::make('password123'),
+                    'password' => Hash::make($password ?: Str::random(48)),
                     'created_at' => now(),
                 ]));
             }

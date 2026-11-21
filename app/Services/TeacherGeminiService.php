@@ -4,7 +4,9 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Throwable;
 
 class TeacherGeminiService
 {
@@ -23,7 +25,7 @@ class TeacherGeminiService
             }
         }
 
-        $instruction = $folderContext . match ($mode) {
+        $instruction = $folderContext.match ($mode) {
             'lesson_plan' => 'أنت مساعد المعلم، صغ خطة درس نموذجية تشمل الأهداف السلوكية، التهيئة الحافزة، خطوات سير الدرس، والتقويم.',
             'exam' => 'أنت خبير امتحاني، صغ أسئلة اختبار مؤتمتة ومسائل مع مفتاح الحل وتوزيع الدرجات الدقيق.',
             'grading_scale' => 'أنت حاسبة سلالم الدرجات للأستاذ، قم بتوزيع علامات الامتحان أو السؤال بالتفصيل المالي والدقيق (درجة كتابة القانون، درجة التعويض، درجة الحساب، درجة الواحدة) مع تفصيل الأرباع والأنصاف ليكون التصحيح عادلاً ومريحاً.',
@@ -34,19 +36,27 @@ class TeacherGeminiService
             default => 'أنت المساعد الأكاديمي الشامل للمعلم في منصة ASATEZAH.',
         };
 
-        $response = Http::timeout(30)->post(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={$apiKey}",
-            [
-                'systemInstruction' => ['parts' => [['text' => $instruction]]],
-                'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
-            ],
-        )->throw();
+        try {
+            $response = Http::withHeaders(['x-goog-api-key' => $apiKey])
+                ->timeout(30)
+                ->post(
+                    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent',
+                    [
+                        'systemInstruction' => ['parts' => [['text' => $instruction]]],
+                        'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
+                    ],
+                )->throw();
 
-        $answer = $response->json('candidates.0.content.parts.0.text');
-        if (! is_string($answer) || trim($answer) === '') {
-            throw new RuntimeException('استجابة Gemini لا تحتوي على إجابة صالحة.');
+            $answer = $response->json('candidates.0.content.parts.0.text');
+            if (! is_string($answer) || trim($answer) === '') {
+                throw new RuntimeException('Gemini returned an empty response.');
+            }
+
+            return $answer;
+        } catch (Throwable $exception) {
+            Log::error('Gemini request failed.', ['exception' => $exception]);
+
+            throw new RuntimeException('تعذر معالجة الطلب عبر المساعد الذكي حالياً.');
         }
-
-        return $answer;
     }
 }

@@ -16,9 +16,14 @@ class EnsureUserCanContribute
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
+        $attributes = $user?->getAttributes() ?? [];
 
         if (! $user
             || (! $user->isTeacher() && ! $user->isAdmin())
+            || ($attributes['status'] ?? 'active') !== 'active'
+            || (bool) ($attributes['is_banned'] ?? false)
+            || ! ($attributes['is_active'] ?? true)
+            || ($attributes['deactivated_at'] ?? null) !== null
             || ! $user->canContribute()) {
             return response()->json([
                 'success' => false,

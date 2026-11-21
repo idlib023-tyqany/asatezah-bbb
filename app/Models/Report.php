@@ -52,7 +52,6 @@ class Report extends Model
      */
     protected $casts = [
         'user_id' => 'integer',
-        'file_id' => 'integer',
         'resolved_by' => 'integer',
         'status' => 'string',
         'resolved_at' => 'datetime',

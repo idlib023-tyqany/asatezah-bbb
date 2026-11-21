@@ -33,7 +33,8 @@ Storage is independent of the Supabase database. The application uses Laravel's
 Flysystem abstraction and `FILESYSTEM_DISK`, so changing between local storage
 and an S3-compatible provider does not require code changes.
 
-- Local: `FILESYSTEM_DISK=local`; files are written under `storage/app/public`.
+- Local: `FILESYSTEM_DISK=local`; uploaded files are stored privately under
+  `storage/app/private` and served only through authenticated API download routes.
 - Amazon S3 or another S3-compatible service: `FILESYSTEM_DISK=s3` and set
   `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION`, and
   `AWS_BUCKET`. Set `AWS_ENDPOINT` for a custom provider, and
@@ -41,6 +42,11 @@ and an S3-compatible provider does not require code changes.
   `AWS_URL` is optional and can provide a public/CDN URL.
 
 The S3 Flysystem adapter is already included in Composer dependencies.
+
+Set `CORS_ALLOWED_ORIGINS` to a comma-separated list of trusted web origins in
+production. The default `*` is intended only for local development. Set
+`GEMINI_API_KEY` for the teacher-only AI assistant. Set
+`ADMIN_DEFAULT_PASSWORD` before seeding an administrator in production.
 
 ### PostgreSQL / Supabase Database
 

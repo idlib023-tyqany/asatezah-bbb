@@ -6,48 +6,32 @@ use App\Http\Controllers\Controller;
 use App\Services\TeacherGeminiService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\RequestException;
-use Illuminate\Support\Facades\Log;
-use RuntimeException;
+use Throwable;
 
 class TeacherGeminiController extends Controller
 {
-    public function __construct(private readonly TeacherGeminiService $teacherGemini)
-    {
-    }
-
-    public function handle(Request $request): JsonResponse
+    public function handle(Request $request, TeacherGeminiService $gemini): JsonResponse
     {
         $validated = $request->validate([
-            'prompt'    => 'required|string',
-            'mode'      => 'required|string',
-            'folder_id' => 'nullable|integer',
+            'prompt' => ['required', 'string', 'max:4000'],
+            'mode' => ['required', 'in:lesson_plan,exam,grading_scale,homework,solve,simplify,formula_sheet'],
+            'folder_id' => ['nullable', 'integer', 'exists:folders,id'],
         ]);
 
         try {
             return response()->json([
                 'status' => 'success',
-                'result' => $this->teacherGemini->answer(
+                'result' => $gemini->answer(
                     $validated['prompt'],
                     $validated['mode'],
                     $validated['folder_id'] ?? null,
                 ),
             ]);
-        } catch (RuntimeException $e) {
-            Log::warning('Teacher Gemini service is unavailable: '.$e->getMessage());
-
+        } catch (Throwable) {
             return response()->json([
                 'status' => 'error',
-                'message' => $e->getMessage(),
-            ], 503);
-        } catch (ConnectionException|RequestException $e) {
-            Log::error('Teacher Gemini request failed: '.$e->getMessage());
-
-            return response()->json([
-                'status'  => 'error',
-                'message' => 'تعذّر الاتصال بخدمة Gemini. يرجى المحاولة لاحقاً.',
-            ], 503);
+                'message' => 'تعذر معالجة الطلب عبر المساعد الذكي حالياً.',
+            ], 502);
         }
     }
 }

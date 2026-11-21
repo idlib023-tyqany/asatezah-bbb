@@ -110,6 +110,7 @@ class RatingController extends Controller
         $avg = $stats?->avg_value ? round((float) $stats->avg_value, 2) : 0.00;
 
         $file->update([
+            'rating_avg' => $avg,
             'avg_rating' => $avg,
             'ratings_count' => $count,
         ]);

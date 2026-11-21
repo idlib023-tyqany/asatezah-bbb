@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\FileIdService;
 use Database\Factories\FileFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +15,10 @@ class File extends Model
 {
     /** @use HasFactory  FileFactory> */
     use HasFactory, SoftDeletes;
+
+    public $incrementing = false;
+
+    protected $keyType = 'string';
 
     public const STATUS_PENDING = 'pending';
 
@@ -32,6 +37,7 @@ class File extends Model
         'material_id',
         'folder_id',
         'title',
+        'name',
         'description',
         'filename',
         'path',
@@ -45,6 +51,8 @@ class File extends Model
         'views_count',
         'downloads_count',
         'favorites_count',
+        'shares_count',
+        'rating_avg',
         'avg_rating',
         'ratings_count',
     ];
@@ -63,9 +71,23 @@ class File extends Model
         'views_count' => 'integer',
         'downloads_count' => 'integer',
         'favorites_count' => 'integer',
+        'shares_count' => 'integer',
         'ratings_count' => 'integer',
+        'rating_avg' => 'float',
         'avg_rating' => 'float',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (File $file): void {
+            $file->id ??= FileIdService::generate20DigitId();
+        });
+
+        static::saving(function (File $file): void {
+            $file->name ??= $file->title;
+            $file->title ??= $file->name;
+        });
+    }
 
     /* ================= العلاقات (Relations) ================= */
 

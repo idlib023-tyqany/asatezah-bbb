@@ -30,7 +30,6 @@ class Favorite extends Model
      */
     protected $casts = [
         'user_id' => 'integer',
-        'file_id' => 'integer',
     ];
 
     /**

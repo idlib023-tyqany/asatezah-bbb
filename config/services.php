@@ -46,6 +46,10 @@ return [
         'bot_token' => env('TELEGRAM_BOT_TOKEN'),
     ],
 
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+    ],
+
     'fcm' => [
         'server_key' => env('FCM_SERVER_KEY'),
     ],

@@ -101,7 +101,9 @@ class AuthController extends Controller
             ], 403);
         }
 
-        if ($user->deactivated_at !== null
+        if (($user->status ?? 'active') !== 'active'
+            || (bool) ($user->is_banned ?? false)
+            || $user->deactivated_at !== null
             || (! $user->is_active && ($user->email_verified_at || $user->phone_verified_at))) {
             return response()->json([
                 'message' => 'Your account has been suspended. Please contact support.',
@@ -168,7 +170,9 @@ class AuthController extends Controller
             }
 
             $user = User::query()->lockForUpdate()->findOrFail($challenge->user_id);
-            if ($user->deactivated_at !== null
+            if (($user->status ?? 'active') !== 'active'
+                || (bool) ($user->is_banned ?? false)
+                || $user->deactivated_at !== null
                 || (! $user->is_active && ($user->email_verified_at || $user->phone_verified_at))) {
                 return ['status' => 'blocked'];
             }

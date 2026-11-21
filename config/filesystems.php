@@ -32,9 +32,8 @@ return [
 
         'local' => [
             'driver' => 'local',
-            'root' => storage_path('app/public'),
-            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
-            'visibility' => 'public',
+            'root' => storage_path('app/private'),
+            'visibility' => 'private',
             'throw' => true,
             'report' => false,
         ],
@@ -42,7 +41,7 @@ return [
         'private' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            'visibility' => 'private',
             'throw' => true,
             'report' => false,
         ],
@@ -65,6 +64,7 @@ return [
             'url' => env('SUPABASE_STORAGE_URL', env('AWS_URL')),
             'endpoint' => env('SUPABASE_STORAGE_ENDPOINT', env('AWS_ENDPOINT')),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', true),
+            'visibility' => 'private',
             'throw' => true,
             'report' => false,
         ],
@@ -87,4 +87,3 @@ return [
     ],
 
 ];
-

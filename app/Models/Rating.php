@@ -32,7 +32,6 @@ class Rating extends Model
      */
     protected $casts = [
         'user_id' => 'integer',
-        'file_id' => 'integer',
         'value' => 'integer',
     ];
 
@@ -50,6 +49,7 @@ class Rating extends Model
                 $ratingsCount = $file->ratings()->count();
 
                 $file->update([
+                    'rating_avg' => round($avgRating, 2),
                     'avg_rating' => round($avgRating, 2),
                     'ratings_count' => $ratingsCount,
                 ]);

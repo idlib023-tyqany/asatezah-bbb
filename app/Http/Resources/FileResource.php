@@ -62,7 +62,8 @@ class FileResource extends JsonResource
                 'views_count' => (int) $this->views_count,
                 'downloads_count' => (int) $this->downloads_count,
                 'favorites_count' => (int) $this->favorites_count,
-                'avg_rating' => round((float) ($this->avg_rating ?? 0), 1),
+                'shares_count' => (int) $this->shares_count,
+                'avg_rating' => round((float) ($this->rating_avg ?? $this->avg_rating ?? 0), 1),
                 'ratings_count' => (int) ($this->ratings_count ?? 0),
             ],
 

@@ -24,7 +24,7 @@ class UploadApiTest extends TestCase
             ->post('/api/upload', [
                 'title' => 'Algebra notes',
                 'description' => 'First chapter.',
-                'file' => UploadedFile::fake()->create('algebra.pdf', 32, 'application/pdf'),
+                'file' => UploadedFile::fake()->createWithContent('algebra.pdf', $this->pdfBytes(32768)),
             ]);
 
         $response
@@ -37,6 +37,7 @@ class UploadApiTest extends TestCase
 
         $file = File::query()->sole();
 
+        $this->assertMatchesRegularExpression('/^\d{20}$/', (string) $file->id);
         $this->assertDatabaseHas('files', [
             'id' => $file->id,
             'uploaded_by' => $user->id,
@@ -62,10 +63,7 @@ class UploadApiTest extends TestCase
             ->post('/api/upload', [
                 'title' => 'Algebra notes',
                 'folder_id' => $folder->id,
-                'file' => UploadedFile::fake()->createWithContent(
-                    'algebra.pdf',
-                    'unique algebra file content',
-                )->mimeType('application/pdf'),
+                'file' => UploadedFile::fake()->createWithContent('algebra.pdf', $this->pdfBytes()),
             ]);
 
         $response->assertCreated();
@@ -130,23 +128,25 @@ class UploadApiTest extends TestCase
         $uploads = [
             [
                 'title' => 'Lesson video',
-                'file' => UploadedFile::fake()
-                    ->createWithContent('lesson.mp4', 'unique video content')
-                    ->mimeType('video/mp4'),
+                'file' => UploadedFile::fake()->createWithContent(
+                    'lesson.mp4',
+                    hex2bin('00000018667479706d703432000000006d70343269736f6d'),
+                ),
                 'folder' => 'videos',
             ],
             [
                 'title' => 'Course notes',
-                'file' => UploadedFile::fake()
-                    ->createWithContent('notes.pdf', 'unique document content')
-                    ->mimeType('application/pdf'),
+                'file' => UploadedFile::fake()->createWithContent('notes.pdf', $this->pdfBytes()),
                 'folder' => 'documents',
             ],
             [
                 'title' => 'Course cover',
                 'file' => UploadedFile::fake()->createWithContent(
                     'cover.png',
-                    'unique image content',
+                    base64_decode(
+                        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aV0cAAAAASUVORK5CYII=',
+                        true,
+                    ),
                 )->mimeType('image/png'),
                 'folder' => 'images',
             ],
@@ -268,6 +268,27 @@ class UploadApiTest extends TestCase
         $this->assertSame([], Storage::disk()->allFiles());
     }
 
+    public function test_upload_rejects_a_mime_and_extension_mismatch(): void
+    {
+        Storage::fake();
+        $user = User::factory()->create(['can_contribute' => true]);
+        $pngBytes = base64_decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aV0cAAAAASUVORK5CYII=',
+            true,
+        );
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/upload', [
+                'title' => 'Mislabelled image',
+                'file' => UploadedFile::fake()->createWithContent('image.pdf', $pngBytes),
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('file');
+
+        $this->assertDatabaseCount('files', 0);
+        $this->assertSame([], Storage::disk()->allFiles());
+    }
+
     public function test_user_without_upload_permission_is_rejected(): void
     {
         Storage::fake();
@@ -294,5 +315,13 @@ class UploadApiTest extends TestCase
         }
 
         $this->postJson('/api/upload', [])->assertTooManyRequests();
+    }
+
+    private function pdfBytes(int $size = 1024): string
+    {
+        $header = "%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n";
+        $ending = '%%EOF';
+
+        return $header.str_repeat(' ', max(0, $size - strlen($header) - strlen($ending))).$ending;
     }
 }
