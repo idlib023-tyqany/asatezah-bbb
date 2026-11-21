@@ -24,6 +24,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 RUN composer install --no-dev --optimize-autoloader
 
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
+ENV LOG_CHANNEL=stderr
 RUN sed -ri -s 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
     && sed -ri -s 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf \
     && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
